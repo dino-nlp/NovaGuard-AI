@@ -95,7 +95,7 @@ class Config:
 
 
         logger.info(f"Config initialized. Ollama URL: {self.ollama_base_url}")
-        logger.debug(f"Models config: {self.models_config}")
+        logger.debug(f"Models config: {self.models_config_full}")
         logger.debug(f"Tools config: {self.tools_config}")
         logger.debug(f"Loaded {len(self.prompt_templates)} prompt templates. Project config loaded: {self.project_config_loaded}")
 
