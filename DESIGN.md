@@ -112,7 +112,7 @@ Hãy coi đây là kim chỉ nam cho quá trình phát triển của bạn. Nế
 * **Công nghệ Chính:**
     * Ngôn ngữ: Python 3.10+
     * Framework LLM: Langchain & LangGraph
-    * LLM Runtime: Ollama (kết nối tới Ollama server đang chạy trên self-hosted runner)
+    * LLM Runtime: Ollama (kết nối tới Ollama server đang chạy trên self-hosted runner), có thêm option để sử dụng Gemini, OpenAI API 
     * Đóng gói Action: Docker
     * Nền tảng CI/CD: GitHub Actions
     * Định dạng Output chính: SARIF (Static Analysis Results Interchange Format) v2.1.0.
