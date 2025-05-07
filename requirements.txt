@@ -1,0 +1,15 @@
+python-dotenv
+requests
+PyYAML
+Jinja2
+pydantic
+langchain
+langchain-community
+langchain-experimental # Cho LangGraph (có thể tách ra nếu langgraph có package riêng)
+langgraph
+ollama # Ollama Python library
+# semgrep # Thường cài như một tool CLI riêng biệt, không qua pip cho core logic.
+#         # Nhưng nếu có nhu cầu dùng API Python của Semgrep thì thêm vào.
+# pylint # Tương tự Semgrep, thường là CLI.
+# eslint # Tương tự.
+# checkstyle # Tương tự.
