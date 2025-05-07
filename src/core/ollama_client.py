@@ -194,6 +194,8 @@ class OllamaClientWrapper:
 
         try:
             for chunk in llm.stream(messages):
+                logger.info(f"RAW STREAM CHUNK (sync): type={type(chunk)}, value={chunk!r}") 
+                logger.debug(f"Raw stream chunk received: type={type(chunk)}, content={getattr(chunk, 'content', 'N/A')}, raw={chunk!r}") # Log chi tiết
                 if isinstance(chunk, (ChatGenerationChunk, GenerationChunk)) and isinstance(chunk.content, str):
                     yield chunk.content
                 # else: (handle other chunk types if necessary, though ChatOllama usually yields AIMessageChunk with string content)
@@ -270,6 +272,7 @@ class OllamaClientWrapper:
 
         try:
             async for chunk in llm.astream(messages):
+                logger.info(f"RAW STREAM CHUNK (async): type={type(chunk)}, value={chunk!r}") 
                 if isinstance(chunk, (ChatGenerationChunk, GenerationChunk)) and isinstance(chunk.content, str):
                     yield chunk.content
         except Exception as e:

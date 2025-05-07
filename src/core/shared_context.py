@@ -2,8 +2,9 @@
 
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict # Import ConfigDict for Pydantic v2 style config
 
+# Import Config to use as a type hint
 from .config_loader import Config
 
 
@@ -26,18 +27,20 @@ class ChangedFile(BaseModel):
         default=None,
         description="The programming language of the file (e.g., 'python', 'javascript'). This can be determined later in the pipeline."
     )
+    model_config = ConfigDict(arbitrary_types_allowed=True) # Pydantic V2 config style
 
 
 class SharedReviewContext(BaseModel):
     """
     Contains shared contextual information about the Pull Request and repository,
-    available throughout the code review process.
+    available throughout the code review process. Includes the application config.
     Field descriptions are in English to aid LLM understanding if this model is used in prompts.
     """
     repository_name: str = Field(
         description="The name of the repository (e.g., 'owner/repo')."
     )
-    repo_local_path: Path = Field(
+    # Use resolved absolute path for consistency
+    repo_local_path: Path = Field( 
         description="The absolute path to the repository's working directory on the self-hosted runner."
     )
     sha: str = Field(
@@ -57,12 +60,16 @@ class SharedReviewContext(BaseModel):
     github_event_payload: Dict[str, Any] = Field(default_factory=dict, description="The full GitHub event payload as a dictionary.")
 
     # Add the application config object here
+    # Ensure Config is imported correctly from .config_loader
     config_obj: Config = Field(description="The loaded application configuration object.")
 
-
-    class Config:
-        arbitrary_types_allowed = True # Allow Path and our Config type
+    # Pydantic V2 style configuration class
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def get_full_file_path(self, relative_file_path: str) -> Path:
-        """Returns the absolute path of a file within the repository."""
-        return self.repo_local_path / relative_file_path
+        """
+        Returns the absolute path of a file within the repository, ensuring it's resolved.
+        """
+        # Clean potential leading slashes from relative path before joining
+        clean_relative_path = relative_file_path.lstrip('/')
+        return (self.repo_local_path / clean_relative_path).resolve()
