@@ -3,7 +3,7 @@
 import logging
 from typing import Literal
 
-from langgraph.graph import StateGraph, END, CompiledGraph
+from langgraph.graph import StateGraph, END
 # Assuming state.py and nodes.py are in the same 'orchestrator' directory
 from .state import GraphState
 from . import nodes # Import the nodes module
@@ -54,8 +54,7 @@ def initial_check_for_files(state: GraphState) -> Literal["proceed_to_tier1", "n
 def get_compiled_graph(
     # The config_obj is passed to allow graph construction decisions if needed,
     # but nodes will access it primarily via `state["shared_context"].config_obj` at runtime.
-    app_config: Config
-) -> CompiledGraph[GraphState]:
+    app_config: Config):
     """
     Constructs and compiles the LangGraph StateGraph for the NovaGuard AI code review process.
 
