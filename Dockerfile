@@ -58,6 +58,8 @@ COPY config/ /app/config/
 # Copy file entrypoint chính
 COPY src/action_entrypoint.py /app/action_entrypoint.py
 
+ENV PYTHONPATH=/app
+
 # ---- User (Optional Best Practice) ----
 # Chạy với user không phải root để tăng cường bảo mật (có thể cần điều chỉnh quyền truy cập GITHUB_WORKSPACE)
 # RUN useradd --create-home --shell /bin/bash appuser
@@ -67,5 +69,5 @@ COPY src/action_entrypoint.py /app/action_entrypoint.py
 
 # ---- Entrypoint ----
 # Định nghĩa lệnh sẽ chạy khi container khởi động
-# ENTRYPOINT ["python", "-m", "src.action_entrypoint"] # Local running
-ENTRYPOINT ["python", "/app/action_entrypoint.py"]
+ENTRYPOINT ["python", "-m", "src.action_entrypoint"]
+# ENTRYPOINT ["python", "/app/action_entrypoint.py"]
