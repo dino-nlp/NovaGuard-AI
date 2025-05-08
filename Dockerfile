@@ -67,4 +67,5 @@ COPY src/action_entrypoint.py /app/action_entrypoint.py
 
 # ---- Entrypoint ----
 # Định nghĩa lệnh sẽ chạy khi container khởi động
-ENTRYPOINT ["python", "-m", "src.action_entrypoint"] 
+# ENTRYPOINT ["python", "-m", "src.action_entrypoint"] 
+ENTRYPOINT ["sh", "-c", "echo '--- DEBUG INFO ---'; pwd; ls -la /app; ls -la /app/src; echo '--- Python Path ---'; python -c 'import sys; print(sys.path)'; echo '--- Trying python -m ---'; python -m src.action_entrypoint"]
