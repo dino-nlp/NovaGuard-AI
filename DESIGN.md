@@ -88,3 +88,230 @@ NovaGuard AI là một hệ thống Đa Agent Lai được thiết kế để ho
 **Lời kết:**
 NovaGuard AI không chỉ là một công cụ, mà là một người đồng hành thông minh, giúp đội ngũ của bạn chinh phục những dòng code chất lượng cao hơn, an toàn hơn và hiệu quả hơn. Bằng cách kết hợp những gì tốt nhất của công nghệ hiện có và trí tuệ nhân tạo tiên tiến, chúng ta có thể tạo ra một cuộc cách mạng nhỏ trong quy trình phát triển phần mềm của mình.
 
+---
+
+### PROMPT
+
+Chào Gemini Coding Partner,
+
+Mục tiêu của prompt này là cung cấp cho bạn một bản thiết kế chi tiết và toàn diện để bạn có thể bắt đầu xây dựng dự án **NovaGuard AI**. Đây là một GitHub Action review code thông minh, sử dụng hệ thống Đa Agent Lai (Hybrid Multi-Agent System) kết hợp các công cụ phân tích tĩnh truyền thống với các mô hình ngôn ngữ lớn (LLM) chạy local qua Ollama.
+
+Hãy coi đây là kim chỉ nam cho quá trình phát triển của bạn. Nếu có bất kỳ điểm nào chưa rõ, đừng ngần ngại đặt câu hỏi.
+
+**Bối cảnh công nghệ:** Chúng ta đang ở tháng 5 năm 2025. Các lựa chọn về framework đã được cân nhắc. Các tên model LLM cụ thể mang tính minh họa và bạn nên tìm hiểu các model open source mới nhất, phù hợp nhất tại thời điểm code, nhưng chúng phải hỗ trợ chạy qua Ollama và có giấy phép cho phép sử dụng thương mại.
+
+---
+
+## Prompt Phát triển Dự án: NovaGuard AI
+
+**1. Tổng quan Dự án:**
+
+* **Tên Dự án:** NovaGuard AI
+* **Loại Dự án:** GitHub Docker Container Action có thể tái sử dụng.
+* **Mục đích:** Cung cấp một giải pháp review code tự động, thông minh, bảo mật (chạy local), và tùy biến cao cho các dự án trên GitHub. NovaGuard AI sẽ phân tích code trong Pull Request (PR), đưa ra các nhận xét, cảnh báo về lỗi, vấn đề bảo mật, phong cách code, và gợi ý cải thiện.
+* **Công nghệ Chính:**
+    * Ngôn ngữ: Python 3.10+
+    * Framework LLM: Langchain & LangGraph
+    * LLM Runtime: Ollama (kết nối tới Ollama server đang chạy trên self-hosted runner), có thêm option để sử dụng Gemini, OpenAI API 
+    * Đóng gói Action: Docker
+    * Nền tảng CI/CD: GitHub Actions
+    * Định dạng Output chính: SARIF (Static Analysis Results Interchange Format) v2.1.0.
+
+**2. Thiết kế Chi tiết Kỹ thuật:**
+
+**I. Đóng gói GitHub Action (`action.yml`, `Dockerfile`, `src/action_entrypoint.py`)**
+
+* **`action.yml` (Metadata File):**
+    * `name`: 'NovaGuard AI Code Review'
+    * `description`: 'An intelligent code review co-pilot using LLMs and traditional tools via local Ollama.'
+    * `author`: (Để trống hoặc tên người phát triển)
+    * `branding`: `icon: 'shield'`, `color: 'blue'`
+    * `inputs`:
+        * `github_token`: `{ description: 'GitHub token for GitHub API interactions (e.g., fetching PR data if needed, though SARIF upload is preferred via a separate action).', required: true, default: '${{ github.token }}' }`
+        * `ollama_base_url`: `{ description: 'Base URL of the running Ollama server.', required: true, default: 'http://localhost:11434' }`
+        * `project_config_path`: `{ description: 'Optional path to a project-specific NovaGuard AI config directory within the target repository (e.g., .github/novaguard_config/).', required: false }`
+        * `sarif_output_file`: `{ description: 'Filename for the generated SARIF report within GITHUB_WORKSPACE.', required: false, default: 'novaguard-report.sarif' }`
+        * `fail_on_severity`: `{ description: 'Minimum severity (e.g., error, warning, note) to cause the action to fail. Default is "none".', required: false, default: 'none' }`
+    * `outputs`:
+        * `report_summary_text`: `{ description: 'A brief text summary of review findings.' }`
+        * `sarif_file_path`: `{ description: 'Workspace-relative path to the generated SARIF report file.' }`
+    * `runs`: `{ using: 'docker', image: 'Dockerfile' }`
+
+* **`Dockerfile`:**
+    * Base Image: `python:3.11-slim`
+    * `WORKDIR /app`
+    * Cài đặt các tool CLI cần thiết (ví dụ: `semgrep`, các linter như `pylint`, `eslint`, `checkstyle` - nếu không cài qua pip). Ưu tiên cài qua `pip` nếu có thể.
+    * Copy `requirements.txt`, chạy `pip install --no-cache-dir -r requirements.txt`.
+    * Copy `src/` vào `/app/src/`, `config/` vào `/app/config/`.
+    * Copy `src/action_entrypoint.py` vào `/app/action_entrypoint.py`.
+    * `ENTRYPOINT ["python", "/app/action_entrypoint.py"]`
+
+* **`src/action_entrypoint.py` (Điểm bắt đầu của Docker Action):**
+    * **Mục đích:** Nhận input từ GitHub Action environment, điều phối toàn bộ quá trình review, và tạo output.
+    * **Logic chính:**
+        1.  Đọc các input từ biến môi trường (ví dụ: `os.environ.get("INPUT_OLLAMA_BASE_URL")`).
+        2.  Lấy thông tin ngữ cảnh GitHub (`GITHUB_EVENT_PATH`, `GITHUB_REPOSITORY`, `GITHUB_WORKSPACE`, `GITHUB_SHA`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`).
+        3.  **Lấy Code Changes:** Sử dụng `git diff ${{ env.GITHUB_BASE_REF }} ${{ env.GITHUB_HEAD_REF }} --name-only` để lấy danh sách file thay đổi, sau đó đọc nội dung các file này từ `GITHUB_WORKSPACE`. Hoặc phân tích `diff_url` của PR. Ưu tiên phân tích các file đã thay đổi.
+        4.  **Tải Cấu hình:** Gọi `ConfigLoader` để tải cấu hình mặc định từ `/app/config` và override bằng `project_config_path` nếu được cung cấp. Truyền `ollama_base_url` vào đối tượng config.
+        5.  **Khởi tạo Orchestrator:** Lấy compiled LangGraph app từ `src.orchestrator.graph_definition.get_compiled_graph(config_data)`.
+        6.  **Chuẩn bị Input cho Graph:** Tạo `initial_graph_input` bao gồm `SharedReviewContext` (chứa PR info, danh sách file thay đổi, nội dung file, `repo_local_path=GITHUB_WORKSPACE`) và các dữ liệu thô cần thiết.
+        7.  **Chạy Orchestrator Graph:** `final_state = orchestrator_app.invoke(initial_graph_input)`.
+        8.  **Xử lý Kết quả:** Lấy danh sách các phát hiện (`List[Dict]`) từ `final_state`.
+        9.  **Tạo Báo cáo SARIF:** Sử dụng `SarifGenerator` để chuyển đổi danh sách phát hiện thành đối tượng JSON SARIF. Lưu file SARIF này vào `GITHUB_WORKSPACE / inputs.sarif_output_file`.
+        10. **Set Action Outputs:**
+            * `print(f"::set-output name=sarif_file_path::{inputs.sarif_output_file}")`
+            * Tạo một tóm tắt text ngắn gọn từ các phát hiện và set output `report_summary_text`.
+        11. **Kiểm tra `fail_on_severity`:** Nếu có các phát hiện với mức độ nghiêm trọng bằng hoặc cao hơn `inputs.fail_on_severity`, thì `sys.exit(1)` để Action fail.
+
+**II. Core Orchestration (LangGraph - trong `src/orchestrator/`)**
+
+* **`state.py` - `GraphState(TypedDict)`:**
+    * `shared_context: SharedReviewContext`
+    * `files_to_review: List[Dict]` (ví dụ: `[{'path': str, 'content': str, 'diff_hunks': Optional[List[str]]}]`)
+    * `tier1_tool_results: Dict[str, List[Dict]]` (key là tên tool, value là list kết quả của tool đó)
+    * `agent_findings: List[Dict]` (danh sách tất cả các phát hiện từ các agent LLM)
+    * `sarif_report_data: Optional[Dict]` (Đối tượng JSON SARIF cuối cùng)
+    * `error_messages: List[str]`
+
+* **`nodes.py` - Các hàm Node cho LangGraph:** (Mỗi hàm nhận `GraphState`, trả về `Dict` để cập nhật state)
+    * **`prepare_review_files_node(state: GraphState) -> Dict:`**: Dựa trên `shared_context` (thông tin diff từ GitHub), xác định danh sách các file cần review và nội dung của chúng. Cập nhật `files_to_review`.
+    * **`run_tier1_tools_node(state: GraphState) -> Dict:`**: Với mỗi file trong `files_to_review`, chạy các tool truyền thống (linters, SAST cơ bản như Semgrep với rule nhẹ) đã được cấu hình trong `tools.yml` thông qua `ToolRunner`. Lưu kết quả vào `tier1_tool_results`.
+    * **`activate_style_guardian_node(state: GraphState) -> Dict:`**: Gọi `StyleGuardianAgent`. Input là các file và kết quả linter từ `tier1_tool_results`. Thêm kết quả vào `agent_findings`.
+    * **`activate_bug_hunter_node(state: GraphState) -> Dict:`**: Gọi `BugHunterAgent`. Input là các file. Thêm kết quả vào `agent_findings`.
+    * **`activate_securi_sense_node(state: GraphState) -> Dict:`**: Gọi `SecuriSenseAgent`. Input là các file và kết quả SAST từ `tier1_tool_results`. Thêm kết quả vào `agent_findings`.
+    * **`activate_opti_tune_node(state: GraphState) -> Dict:`**: Gọi `OptiTuneAgent`. Input là các file. Thêm kết quả vào `agent_findings`.
+    * **`(Optional) run_meta_review_node(state: GraphState) -> Dict:`**: Gọi `MetaReviewerAgent` để lọc, ưu tiên và tinh chỉnh `agent_findings`.
+    * **`generate_sarif_report_node(state: GraphState) -> Dict:`**: Gọi `SarifGenerator` để chuyển đổi `tier1_tool_results` và `agent_findings` (đã được chuẩn hóa) thành một báo cáo SARIF. Cập nhật `sarif_report_data`.
+
+* **`graph_definition.py` - `get_compiled_graph(config_data: Config) -> CompiledGraph:`**:
+    * Khởi tạo `StateGraph(GraphState)`.
+    * Thêm các node đã định nghĩa.
+    * **Entry Point:** `prepare_review_files_node`.
+    * **Edges:**
+        * `prepare_review_files_node` -> `run_tier1_tools_node`.
+        * `run_tier1_tools_node` -> (điểm bắt đầu của các agent, có thể chạy song song nếu độc lập, hoặc tuần tự). Cân nhắc việc các agent chỉ hoạt động trên các file phù hợp với ngôn ngữ của chúng.
+        * Các agent node -> `run_meta_review_node` (nếu có) -> `generate_sarif_report_node`.
+    * **Conditional Edges:** Có thể dùng để bỏ qua một số agent nếu không có file phù hợp hoặc dựa trên cấu hình.
+    * Compile graph và trả về.
+
+**III. Specialized Hybrid Agents (trong `src/agents/`)**
+
+* Mỗi agent là một class, ví dụ `StyleGuardianAgent`.
+* **`__init__(self, config: Config, ollama_client: OllamaClientWrapper, prompt_manager: PromptManager, tool_runner: Optional[ToolRunner] = None)`**.
+* **`review(self, files_data: List[Dict], tool_outputs_for_agent: Optional[List[Dict]] = None) -> List[Dict]:`**:
+    * `files_data`: danh sách các file (`{'path': str, 'content': str, 'language': str}`).
+    * `tool_outputs_for_agent`: kết quả từ các tool liên quan đến agent này (ví dụ, output của Pylint cho StyleGuardian).
+    * **Logic:**
+        1.  Lặp qua `files_data`.
+        2.  **Tích hợp Tool:** Nếu có `tool_outputs_for_agent`, sử dụng chúng.
+        3.  **LLM Interaction:**
+            * Xây dựng prompt (sử dụng `PromptManager`) dựa trên nội dung file, output của tool (nếu có), ngôn ngữ, và các yêu cầu cụ thể của agent.
+            * Gọi `ollama_client.invoke(prompt, model_name=self.config.get_model_for_agent(self.agent_name))`.
+            * Phân tích output của LLM (kỳ vọng là JSON hoặc markdown có cấu trúc).
+            * Chuyển đổi thành một cấu trúc dictionary chuẩn cho mỗi "phát hiện" (finding), bao gồm: `file_path`, `line_start`, `line_end`, `message_text`, `level` (error, warning, note - theo SARIF), `rule_id` (tên agent + mã lỗi), `code_snippet_suggestion` (nếu có).
+        4.  Trả về `List[Dict]` các phát hiện.
+
+* **Cụ thể cho từng Agent:**
+    * **`StyleGuardianAgent`:** Sử dụng output từ linters (Pylint, ESLint, Checkstyle...). LLM giải thích, gợi ý sửa lỗi phức tạp, tìm vấn đề phong cách khác.
+    * **`BugHunterAgent`:** LLM tập trung tìm lỗi logic, null pointers, resource leaks, side effects.
+    * **`SecuriSenseAgent`:** Sử dụng output từ SAST tools (Semgrep...). LLM giúp lọc false positives, giải thích, gợi ý vá lỗi, tìm mẫu mới (cẩn trọng).
+    * **`OptiTuneAgent`:** LLM tìm điểm nghẽn hiệu năng, gợi ý tối ưu, dùng feature mới của ngôn ngữ.
+    * **`(Optional) MetaReviewerAgent`:** LLM nhận tất cả `agent_findings`, lọc trùng lặp, đánh giá độ tin cậy, tổng hợp.
+
+**IV. Core Utility Modules (trong `src/core/`)**
+
+* **`config_loader.py` - `Config` class & `load_config()`:**
+    * Tải `models.yml` (tên model Ollama cho từng agent/task), `tools.yml` (command, args cho Pylint, Semgrep...).
+    * Tải prompt templates từ `config/prompts/`.
+    * Lưu trữ `ollama_base_url`.
+* **`ollama_client.py` - `OllamaClientWrapper`:**
+    * Kết nối tới `ollama_base_url`.
+    * Phương thức `invoke(prompt: str, model_name: str, system_message: Optional[str] = None, temperature: float = 0.5, ...) -> str`.
+* **`tool_runner.py` - `ToolRunner`:**
+    * Phương thức `run(tool_name: str, file_path: str, project_root: str) -> Dict:` (trả về output đã parse, ví dụ JSON nếu tool hỗ trợ, hoặc text thô). Cần xử lý `cwd` và các tham số dòng lệnh.
+* **`sarif_generator.py` - `SarifGenerator` class hoặc functions:**
+    * Phương thức `add_finding(self, file_path: str, line_start: int, message_text: str, rule_id: str, level: str, ...)`.
+    * Phương thức `get_sarif_report() -> Dict:` (trả về đối tượng JSON SARIF hoàn chỉnh). Tuân thủ schema SARIF v2.1.0.
+* **`prompt_manager.py` - `PromptManager`:**
+    * `get_prompt(prompt_name: str, variables: Dict) -> str` (sử dụng Jinja2 templates).
+* **`shared_context.py` - `SharedReviewContext(BaseModel)` (Pydantic model):**
+    * Định nghĩa rõ ràng cấu trúc dữ liệu này (PR URL, diff content, list files/content, repo_local_path, etc.).
+
+**V. Hệ thống Cấu hình (trong `config/`)**
+
+* **`models.yml`:**
+    ```yaml
+    agents:
+      style_guardian: "codellama:13b-instruct-q5_K_M" # Tên model trên Ollama
+      bug_hunter: "deepseek-coder:33b-instruct-q4_K_M"
+      # ...
+    meta_reviewer: "mistral:7b-instruct-v0.2-q5_K_M"
+    ```
+* **`tools.yml`:**
+    ```yaml
+    linters:
+      python: "pylint --output-format=json --rcfile={project_root}/.pylintrc {file_path}"
+      # javascript: "eslint -f json -c {project_root}/.eslintrc.js {file_path}"
+    sast:
+      generic: "semgrep scan --config auto --json --output {output_file} {project_root}"
+    ```
+* **`prompts/` directory:** Chứa các file template (ví dụ: `style_guardian_python.md`).
+
+**VI. Xử lý Lỗi và Logging:**
+
+* Sử dụng `logging` module của Python.
+* Các node trong LangGraph nên bắt lỗi và cập nhật `error_messages` trong `GraphState`.
+* `action_entrypoint.py` nên log các bước chính và output các lỗi ra stdout/stderr để GitHub Actions hiển thị.
+
+**3. Ghi chú Phát triển và Kiểm thử:**
+
+* Viết unit test cho các utility function, logic phân tích output của LLM, và các phần quan trọng của agent.
+* Tạo workflow `test_action.yml` trong `.github/workflows/` để build Docker image và chạy action trên một PR mẫu trong chính repo NovaGuard AI.
+* Thiết lập một quy trình kiểm thử local (ví dụ, một script `run_local.py` mô phỏng `action_entrypoint.py` với dữ liệu mẫu) để tăng tốc độ phát triển.
+* Tập trung vào việc làm cho output của LLM có cấu trúc (JSON) để dễ parse.
+
+**4. Workflow Ví dụ cho Người dùng (trong README.md của NovaGuard AI):**
+
+```yaml
+name: NovaGuard AI Code Review
+
+on: pull_request
+
+permissions:
+  contents: read
+  security-events: write # Để upload SARIF
+
+jobs:
+  novaguard_review:
+    runs-on: self-hosted # Runner này PHẢI cài Ollama và có các model cần thiết
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # Lấy full history để git diff hoạt động đúng
+
+      - name: Run NovaGuard AI
+        uses: YOUR_USERNAME/novaguard_ai@v1 # Thay bằng repo của bạn
+        id: novaguard
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          ollama_base_url: 'http://your-ollama-server-address:11434'
+          # project_config_path: '.github/novaguard_config' # Tùy chọn
+          sarif_output_file: 'results/novaguard.sarif'
+          # fail_on_severity: 'warning' # Tùy chọn
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: success() || failure() # Chạy ngay cả khi step trước fail (để upload report)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.novaguard.outputs.sarif_file_path }}
+          category: 'NovaGuardAI'
+```
+
+**5. Lời nhắn cuối cùng cho Gemini Coding Partner:**
+
+Bản thiết kế này là một khung sườn chi tiết. Trong quá trình code, bạn có thể sẽ gặp những quyết định nhỏ cần đưa ra. Hãy ưu tiên sự rõ ràng, module hóa, và khả năng bảo trì. Nếu cần thiết kế lại một phần nhỏ để tối ưu hơn, hãy đề xuất. 
+LƯU Ý: 
+- Khi tạo cấu trúc project vui lòng tạo bash file đính kèm để tạo list folder/file nhanh hơn (Tôi đã tạo folder NOVAGUARD-AI) rồi.
+- Viết code lần lượt và ĐẦY ĐỦ ngay từ đầu.
+Chúc may mắn và hãy tạo ra một NovaGuard AI thật ấn tượng!
+

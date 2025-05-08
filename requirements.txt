@@ -1,0 +1,39 @@
+
+# Để load biến môi trường từ .env khi test local
+python-dotenv
+
+# Cho các HTTP request
+requests
+
+# Để đọc file config YAML
+PyYAML
+
+# Cho prompt templating
+Jinja2
+
+# Để validate dữ liệu, ví dụ SharedReviewContext
+pydantic
+
+# Core Langchain
+langchain
+
+# Các integration cộng đồng và components của Langchain
+langchain-community
+
+# LangGraph để xây dựng các agent và flow phức tạp
+langgraph
+
+# Tích hợp Ollama với Langchain
+langchain-ollama
+
+# langsmith để theo dõi và gỡ lỗi (tùy chọn, nhưng rất hữu ích)
+# langsmith>=0.2.0
+
+# --- Các thư viện CLI cho tools ---
+# Những thư viện này thường được cài đặt trong Dockerfile
+# nếu phiên bản cụ thể quan trọng hoặc muốn quản lý qua pip.
+# Nếu không, Dockerfile có thể cài bản mới nhất từ apt hoặc npm.
+#
+# Ví dụ:
+# semgrep>=1.70.0 # Semgrep cũng cập nhật thường xuyên
+# pylint>=3.2.0   # Pylint cũng có các bản phát hành đều đặn

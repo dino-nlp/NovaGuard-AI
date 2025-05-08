@@ -1,0 +1,24 @@
+{
+    "pull_request": {
+      "number": 123,
+      "html_url": "https://github.com/test-user/test-repo/pull/123",
+      "title": "Test PR for NovaGuard",
+      "body": "Testing the NovaGuard AI action.",
+      "diff_url": "https://github.com/test-user/test-repo/pull/123.diff",
+      "head": {
+        "ref": "feature-branch",
+        "sha": "37993cc815647deeb6e5d7870fcd05e5aac95a55" 
+      },
+      "base": {
+        "ref": "main",
+        "sha": "59cda5cdd5263f385c7355737ff7a70f554078c8"
+      }
+    },
+    "repository": {
+      "name": "test-repo",
+      "full_name": "test-user/test-repo",
+      "html_url": "https://github.com/test-user/test-repo"
+    },
+    "number": 123, 
+    "action": "opened" 
+  }
