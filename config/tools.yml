@@ -20,7 +20,7 @@ linters:
     # Pylint output JSON ra stdout.
     # ToolRunner sẽ bắt stdout và parse nếu expect_json_output=True.
     # --rcfile có thể trỏ đến file cấu hình pylint trong repo người dùng hoặc một file mặc định.
-    command: "pylint --output-format=json --msg-template='{line_start},{column_offset}: [{msg_id}({symbol}), {obj}] {msg}' --reports=no {file_path}"
+    command: "pylint --output-format=json --msg-template='{{line_start}},{{column_offset}}: [{{msg_id}}({{symbol}}), {{obj}}] {{msg}}' --reports=no {file_path} --rcfile={project_root}/.pylintrc"
     # Thêm: --rcfile={project_root}/.pylintrc (nếu muốn người dùng tự config)
     # hoặc --rcfile=/app/config/default_pylintrc (nếu bạn cung cấp rc mặc định)
 

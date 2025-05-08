@@ -74,6 +74,7 @@ class MetaReviewerAgent(BaseAgent):
         files_context_str = "The review involved the following files:\n" + "\n".join([f"- {fp}" for fp in file_paths_involved])
 
         prompt_variables = {
+            "agent_name": self.agent_name,
             "raw_findings_text": formatted_findings_str,
             "num_findings_from_agents": len(all_agent_findings),
             "files_context": files_context_str,
@@ -121,7 +122,8 @@ If, after your review, no findings are deemed valid or actionable, return an emp
                 temperature=0.2 # Meta-review should be more analytical and less creative
             )
 
-            logger.debug(f"<{self.agent_name}> LLM raw response for meta-review: {response_text[:500]}...")
+            # --- DEBUG LOG ---
+            logger.info(f"<{self.agent_name}> RAW LLM RESPONSE \n>>> START LLM RESPONSE <<<\n{response_text.strip()}\n>>> END LLM RESPONSE <<<")
             
             refined_llm_findings = json.loads(response_text)
             if not isinstance(refined_llm_findings, list):

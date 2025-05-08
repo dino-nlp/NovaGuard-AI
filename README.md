@@ -12,6 +12,8 @@ python -m unittest tests.core.test_tool_runner
 python -m unittest tests.orchestrator.test_nodes
 python -m unittest tests.orchestrator.test_graph_definition
 
+# Integration graph test
+python -m unittest tests.test_integration_graph
 ```
 
 Hoặc để chạy tất cả các test trong thư mục tests: 

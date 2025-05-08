@@ -114,16 +114,33 @@ class Config:
             logger.warning(f"Model name not found for task: {task_name} in active mode: {self.active_mode}")
         return model_name
 
+    # --- START MODIFICATION ---
     def get_tool_command_template(self, tool_category: str, tool_key: str) -> Optional[str]:
         """
-        Retrieves the command template for a specific tool.
-        Example path in tools.yml: <tool_category> -> <tool_key> (e.g., linters -> python)
-        The tool_key could be a language or a specific tool name.
+        Retrieves the command template string for a specific tool.
+        Handles cases where the config value is a string or a dictionary containing 'command'.
         """
-        command_template = self.tools_config.get(tool_category, {}).get(tool_key)
+        # Lấy toàn bộ config cho tool đó (có thể là str hoặc dict)
+        tool_cfg = self.tools_config.get(tool_category, {}).get(tool_key)
+        
+        command_template: Optional[str] = None
+        if isinstance(tool_cfg, str):
+            # Nếu giá trị là string, thì đó chính là command template
+            command_template = tool_cfg 
+        elif isinstance(tool_cfg, dict):
+            # Nếu giá trị là dict, lấy giá trị của key 'command' bên trong
+            command_template = tool_cfg.get("command") 
+            # Kiểm tra xem giá trị lấy ra có phải string không
+            if not isinstance(command_template, str):
+                 logger.warning(f"Found dictionary config for '{tool_category}.{tool_key}' but 'command' key is missing or not a string.")
+                 command_template = None # Đặt lại là None nếu không hợp lệ
+        
+        # Log warning nếu cuối cùng vẫn không tìm thấy command template hợp lệ
         if not command_template:
-            logger.warning(f"Command template not found for tool category '{tool_category}' and key '{tool_key}'")
+            logger.warning(f"Command template string not found or invalid for tool category '{tool_category}' and key '{tool_key}'")
+            
         return command_template
+    # --- END MODIFICATION ---
     
     def get_tool_config(self, tool_category: str, tool_key: str) -> Optional[Union[str, Dict[str, Any]]]:
         """
@@ -141,7 +158,8 @@ class Config:
         """Retrieves a specific prompt template by its name (filename stem)."""
         template = self.prompt_templates.get(prompt_name)
         if not template:
-            logger.warning(f"Prompt template not found: {prompt_name}")
+            # Giảm mức log xuống debug vì đây là kiểm tra thông thường, không phải lỗi
+            logger.debug(f"Prompt template not found in config: {prompt_name}")
         return template
 
 
