@@ -324,7 +324,7 @@ Dựa trên thiết kế ban đầu và những gì chúng ta đã xây dựng, 
 
 **I. Cải thiện Chất lượng Review và Độ chính xác của Agent:**
 
-1.  **Tinh chỉnh Prompt Chuyên sâu (Prompt Engineering):**
+1.  **Tinh chỉnh Prompt Chuyên sâu (Prompt Engineering):** (**UPDATED**)
     * **Thử nghiệm nhiều biến thể prompt:** Với mỗi agent, thử các cách diễn đạt khác nhau, thay đổi lượng context, và cấu trúc output yêu cầu để xem model nào phản hồi tốt nhất với prompt nào.
     * **Chain-of-Thought (CoT) / Reasoning Steps:** Yêu cầu LLM giải thích các bước suy luận của nó *trước khi* đưa ra finding cuối cùng. Điều này có thể cải thiện độ chính xác, đặc biệt với BugHunter và SecuriSense. Bạn có thể yêu cầu LLM output phần giải thích này (để debug) hoặc chỉ dùng nó như một bước trung gian.
     * **Few-Shot Learning trong Prompt:** Cung cấp một vài ví dụ (examples) về code tốt/xấu và finding mong muốn ngay trong prompt để "hướng dẫn" LLM tốt hơn, đặc biệt cho các lỗi phức tạp hoặc đặc thù của dự án.
