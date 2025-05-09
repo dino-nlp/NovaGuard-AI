@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from .base_agent import BaseAgent
-from ..core.shared_context import ChangedFile
+from ..core.shared_context import ChangedFile, SharedReviewContext
 from ..core.config_loader import Config
 from ..core.ollama_client import OllamaClientWrapper
 from ..core.prompt_manager import PromptManager
@@ -33,7 +33,8 @@ class BugHunterAgent(BaseAgent):
     def review(
         self,
         files_data: List[ChangedFile],
-        tier1_tool_results: Optional[Dict[str, Any]] = None
+        tier1_tool_results: Optional[Dict[str, Any]] = None,
+        pr_context: Optional[SharedReviewContext] = None
     ) -> List[Dict[str, Any]]:
         logger.info(f"<{self.agent_name}> Starting bug hunt for {len(files_data)} files.")
         all_findings: List[Dict[str, Any]] = []
@@ -41,6 +42,10 @@ class BugHunterAgent(BaseAgent):
         if not relevant_files:
             logger.info(f"<{self.agent_name}> No files match supported languages for bug hunting. Skipping.")
             return all_findings
+        
+        # Lấy thông tin PR từ pr_context
+        pr_title_for_prompt = pr_context.pr_title if pr_context and pr_context.pr_title else "Not available"
+        pr_description_for_prompt = pr_context.pr_body if pr_context and pr_context.pr_body else "Not available"
 
         for file_data in relevant_files:
             logger.debug(f"<{self.agent_name}> Hunting for bugs in file: {file_data.path} (Language: {file_data.language})")
@@ -57,16 +62,22 @@ class BugHunterAgent(BaseAgent):
                 "file_content": file_data.content,
                 "language": file_data.language,
                 "additional_context": additional_context_from_tools,
-                "output_format_instructions": """Please provide your findings as a JSON list. Each object in the list should represent a single potential bug and have the following keys:
+                "pr_title": pr_title_for_prompt,           
+                "pr_description": pr_description_for_prompt,
+                "output_format_instructions": """Please provide your findings STRICTLY as a JSON list.
+- If multiple issues are found, return a list of JSON objects.
+- If only one issue is found, return a list containing a single JSON object.
+- If no potential bugs are found, return an empty JSON list: [].
+Each JSON object in the list should represent a single potential bug and have AT LEAST the following keys:
 - "line_start": integer (the line number where the potential bug starts or is most evident)
-- "line_end": integer (optional, the line number where the scope of the bug ends)
 - "message": string (a concise description of the potential bug and its impact)
-- "bug_type": string (e.g., "NullPointerException", "ResourceLeak", "OffByOneError", "LogicError", "RaceCondition", "DataCorruption", "SecurityVulnerability_ CWE-ID_IF_APPLICABLE")
-- "explanation": string (a brief explanation of why this is a potential bug)
+- "bug_type": string (e.g., "NullPointerException", "ResourceLeak", "LogicError")
+- "explanation_steps": list_of_strings (your step-by-step reasoning why this is a potential bug)
+- "severity": string (your assessment of severity: "critical", "high", "medium", "low")
+You MAY also include these OPTIONAL keys if applicable:
+- "line_end": integer (optional, the line number where the scope of the bug ends)
 - "suggestion": string (optional, a brief suggestion on how to fix or further investigate it)
-- "severity": string (your assessment of severity: "critical", "high", "medium", "low", or "info"/"note")
-- "confidence": string (optional, your confidence in this finding: "high", "medium", "low")
-If no potential bugs are found, return an empty list []."""
+- "confidence": string (optional, your confidence in this finding: "high", "medium", "low")"""
             }
             rendered_prompt = self.prompt_manager.get_prompt(prompt_template_name, prompt_variables)
             if not rendered_prompt:
@@ -85,6 +96,7 @@ If no potential bugs are found, return an empty list []."""
                     system_message_content=system_msg, is_json_mode=True, temperature=0.4
                 )
                 # --- DEBUG LOG ---
+                logger.info(f"<{self.agent_name}>:\n>>> START PROMP <<<\n{rendered_prompt.strip()}\n>>> END PROMPT <<<")
                 logger.info(f"<{self.agent_name}> RAW LLM RESPONSE for {file_data.path}:\n>>> START LLM RESPONSE <<<\n{response_text.strip()}\n>>> END LLM RESPONSE <<<")
 
                 llm_findings_list: List[Dict] = []

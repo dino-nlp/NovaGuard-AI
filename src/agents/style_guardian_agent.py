@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from .base_agent import BaseAgent
-from ..core.shared_context import ChangedFile
+from ..core.shared_context import ChangedFile,SharedReviewContext
 from ..core.config_loader import Config
 from ..core.ollama_client import OllamaClientWrapper
 from ..core.prompt_manager import PromptManager
@@ -37,14 +37,14 @@ class StyleGuardianAgent(BaseAgent):
         if not tier1_tool_results or not language: return linter_messages
         linter_category_results = tier1_tool_results.get("linters", {})
         if not isinstance(linter_category_results, dict):
-             logger.warning(f"<{self.agent_name}> Expected 'linters' key in tier1_tool_results to be a dict, got {type(linter_category_results)}")
-             return linter_messages
+            logger.warning(f"<{self.agent_name}> Expected 'linters' key in tier1_tool_results to be a dict, got {type(linter_category_results)}")
+            return linter_messages
         specific_linter_findings = linter_category_results.get(language.lower(), [])
         if not isinstance(specific_linter_findings, list):
-             logger.warning(f"<{self.agent_name}> Expected findings for language '{language.lower()}' under 'linters' to be a list, got {type(specific_linter_findings)}")
-             return linter_messages
+            logger.warning(f"<{self.agent_name}> Expected findings for language '{language.lower()}' under 'linters' to be a list, got {type(specific_linter_findings)}")
+            return linter_messages
         for finding in specific_linter_findings:
-             if isinstance(finding, dict) and finding.get("file_path") == file_path:
+            if isinstance(finding, dict) and finding.get("file_path") == file_path:
                 msg = f"- Linter ({finding.get('tool_name', 'linter')}.{finding.get('rule_id', 'N/A')}) at line {finding.get('line_start', 'N/A')}: {finding.get('message_text', 'N/A')}"
                 linter_messages.append(msg)
         if linter_messages: logger.debug(f"Found {len(linter_messages)} linter issues for {file_path} to include in prompt.")
@@ -53,7 +53,8 @@ class StyleGuardianAgent(BaseAgent):
     def review(
         self,
         files_data: List[ChangedFile],
-        tier1_tool_results: Optional[Dict[str, Any]] = None
+        tier1_tool_results: Optional[Dict[str, Any]] = None, 
+        pr_context: Optional[SharedReviewContext] = None
     ) -> List[Dict[str, Any]]:
         logger.info(f"<{self.agent_name}> Starting style review for {len(files_data)} files.")
         all_findings: List[Dict[str, Any]] = []
@@ -61,6 +62,10 @@ class StyleGuardianAgent(BaseAgent):
         if not relevant_files:
             logger.info(f"<{self.agent_name}> No files match supported languages. Skipping review.")
             return all_findings
+        
+        # Lấy thông tin PR từ pr_context
+        pr_title_for_prompt = pr_context.pr_title if pr_context and pr_context.pr_title else "Not available"
+        pr_description_for_prompt = pr_context.pr_body if pr_context and pr_context.pr_body else "Not available"
 
         for file_data in relevant_files:
             logger.debug(f"<{self.agent_name}> Reviewing file: {file_data.path} (Language: {file_data.language})")
@@ -77,14 +82,21 @@ class StyleGuardianAgent(BaseAgent):
                 "file_content": file_data.content,
                 "language": file_data.language,
                 "linter_feedback": linter_context_str,
-                "output_format_instructions": """Please provide your findings as a JSON list. Each object in the list should represent a single style issue and have the following keys:
+                "pr_title": pr_title_for_prompt,           
+                "pr_description": pr_description_for_prompt,
+                "output_format_instructions": """Please provide your findings STRICTLY as a JSON list.
+- If multiple issues are found, return a list of JSON objects. Example: [{"line_start": ..., "message": ...}, {"line_start": ..., "message": ...}]
+- If only one issue is found, return a list containing a single JSON object. Example: [{"line_start": ..., "message": ...}]
+- If no style issues are found, return an empty JSON list. Example: []
+Each JSON object in the list should represent a single style issue and have AT LEAST the following keys:
 - "line_start": integer (the line number where the issue starts)
-- "line_end": integer (optional, the line number where the issue ends, defaults to line_start)
 - "message": string (a concise description of the style issue)
 - "suggestion": string (optional, a brief suggestion on how to fix it or improve)
-- "severity": string (your assessment of severity, e.g., "low", "medium", "high", or "info", "warning", "error")
-- "confidence": string (optional, e.g. "high", "medium", "low" - your confidence in this finding)
-If no style issues are found, return an empty list []."""
+- "severity": string (your assessment of severity: "low", "medium", "high")
+You MAY also include these OPTIONAL keys if applicable:
+- "line_end": integer (the line number where the issue ends, defaults to line_start)
+- "confidence": string (e.g. "high", "medium", "low" - your confidence in this finding)
+- "explanation_steps": list_of_strings (optional, brief step-by-step reasoning for your finding)"""
             }
             rendered_prompt = self.prompt_manager.get_prompt(prompt_template_name, prompt_variables)
             if not rendered_prompt:
@@ -103,6 +115,7 @@ If no style issues are found, return an empty list []."""
                     system_message_content=system_msg, is_json_mode=True, temperature=0.2
                 )
                 # --- DEBUG LOG ---
+                logger.info(f"<{self.agent_name}>:\n>>> START PROMPT <<<\n{rendered_prompt.strip()}\n>>> END PROMPT <<<")
                 logger.info(f"<{self.agent_name}> RAW LLM RESPONSE for {file_data.path}:\n>>> START LLM RESPONSE <<<\n{response_text.strip()}\n>>> END LLM RESPONSE <<<")
                 
                 llm_findings_list: List[Dict] = []
