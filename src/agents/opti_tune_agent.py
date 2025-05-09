@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from .base_agent import BaseAgent
-from ..core.shared_context import ChangedFile
+from ..core.shared_context import ChangedFile, SharedReviewContext
 from ..core.config_loader import Config
 from ..core.ollama_client import OllamaClientWrapper
 from ..core.prompt_manager import PromptManager
@@ -33,7 +33,8 @@ class OptiTuneAgent(BaseAgent):
     def review(
         self,
         files_data: List[ChangedFile],
-        tier1_tool_results: Optional[Dict[str, Any]] = None
+        tier1_tool_results: Optional[Dict[str, Any]] = None,
+        pr_context: Optional[SharedReviewContext] = None
     ) -> List[Dict[str, Any]]:
         logger.info(f"<{self.agent_name}> Starting performance optimization review for {len(files_data)} files.")
         all_findings: List[Dict[str, Any]] = []
@@ -41,6 +42,10 @@ class OptiTuneAgent(BaseAgent):
         if not relevant_files:
             logger.info(f"<{self.agent_name}> No files match supported languages for optimization review. Skipping.")
             return all_findings
+        
+        # Lấy thông tin PR từ pr_context
+        pr_title_for_prompt = pr_context.pr_title if pr_context and pr_context.pr_title else "Not available"
+        pr_description_for_prompt = pr_context.pr_body if pr_context and pr_context.pr_body else "Not available"
 
         for file_data in relevant_files:
             logger.debug(f"<{self.agent_name}> Optimizing file: {file_data.path} (Language: {file_data.language})")
@@ -54,8 +59,33 @@ class OptiTuneAgent(BaseAgent):
                 "file_path": file_data.path,
                 "file_content": file_data.content,
                 "language": file_data.language,
-                "optimization_goals": ("Identify potential performance bottlenecks..."),
-                "output_format_instructions": """Please provide your findings as a JSON list... (instructions as before)"""
+                "pr_title": pr_title_for_prompt,           
+                "pr_description": pr_description_for_prompt,
+                "optimization_goals": ( 
+                    "Identify potential performance bottlenecks related to CPU usage, memory allocation/management, "
+                    "I/O operations, or inefficient algorithms and data structures. "
+                    "Suggest specific, actionable improvements. These could include using more efficient library functions, "
+                    "optimizing loops, choosing better data structures, applying concurrency/parallelism patterns where "
+                    "appropriate (and safe), reducing redundant computations, or leveraging modern language features for "
+                    "better performance. Clearly explain *why* the suggestion improves performance and what trade-offs "
+                    "might exist (e.g., memory vs. speed, readability vs. performance)."
+                ),
+                "output_format_instructions": """Please provide your findings STRICTLY as a JSON list.
+- If multiple optimization opportunities are found, return a list of JSON objects.
+- If only one opportunity is found, return a list containing a single JSON object.
+- If no clear optimization opportunities are found, return an empty JSON list: [].
+Each JSON object in the list should represent a single optimization suggestion and have AT LEAST the following keys:
+- "line_start": integer (the primary line number related to the optimization opportunity)
+- "message": string (a concise description of the optimization opportunity and its potential benefit)
+- "optimization_type": string (e.g., "AlgorithmRefinement", "DataStructureChoice", "ConcurrencyParallelism", "MemoryManagement", "IOBoundOptimization", "LanguageFeatureAdoption", "LoopOptimization", "CachingStrategy", "RedundantComputation")
+- "explanation_steps": list_of_strings (your step-by-step reasoning explaining why the current code might be suboptimal and how the suggestion improves performance, including any relevant trade-offs)
+- "suggested_change": string (a concrete suggestion, ideally with a small code snippet illustrating the 'before' and 'after', or a clear description of the change required)
+- "estimated_impact": string (your assessment of potential performance gain: "low", "medium", "high", "significant")
+You MAY also include these OPTIONAL keys if applicable:
+- "line_end": integer (optional, the end line number of the relevant code block)
+- "implementation_difficulty": string (optional, your assessment of how difficult it is to implement: "low", "medium", "high")
+- "confidence": string (optional, your confidence in this suggestion: "high", "medium", "low")
+"""
             }
             rendered_prompt = self.prompt_manager.get_prompt(prompt_template_name, prompt_variables)
             if not rendered_prompt:
@@ -74,6 +104,7 @@ class OptiTuneAgent(BaseAgent):
                     system_message_content=system_msg, is_json_mode=True, temperature=0.5
                 )
                 # --- DEBUG LOG ---
+                logger.info(f"<{self.agent_name}>:\n>>> START PROMP <<<\n{rendered_prompt.strip()}\n>>> END PROMPT <<<")
                 logger.info(f"<{self.agent_name}> RAW LLM RESPONSE for {file_data.path}:\n>>> START LLM RESPONSE <<<\n{response_text.strip()}\n>>> END LLM RESPONSE <<<")
 
                 llm_findings_list: List[Dict] = []

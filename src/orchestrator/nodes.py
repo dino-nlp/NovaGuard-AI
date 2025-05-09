@@ -214,20 +214,78 @@ def run_tier1_tools_node(state: GraphState) -> Dict[str, Any]:
     return {"tier1_tool_results": tier1_results, "error_messages": error_messages}
 
 
-# --- Các node activate agent và generate_sarif giữ nguyên như bản trước ---
-def _activate_agent_node(agent_class: type, agent_name_log: str, state: GraphState, extra_agent_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    logger.info(f"--- Running: Activate {agent_name_log} Node ---"); shared_ctx: Optional[SharedReviewContext] = state.get("shared_context"); files_to_review = state.get("files_to_review", []); current_agent_findings = list(state.get("agent_findings", [])); error_messages = list(state.get("error_messages", []));
-    if not shared_ctx or not hasattr(shared_ctx, 'config_obj'): msg = f"Config object not found for {agent_name_log}."; logger.error(msg); error_messages.append(msg); return {"agent_findings": current_agent_findings, "error_messages": error_messages}
-    config_obj: Config = shared_ctx.config_obj; ollama_client = OllamaClientWrapper(base_url=config_obj.ollama_base_url); prompt_manager = PromptManager(config=config_obj)
+def _activate_agent_node(
+    agent_class: type, 
+    agent_name_log: str, 
+    state: GraphState, 
+    extra_agent_input: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    logger.info(f"--- Running: Activate {agent_name_log} Node ---")
+    shared_ctx: Optional[SharedReviewContext] = state.get("shared_context")
+    files_to_review: List[ChangedFile] = state.get("files_to_review", [])
+    current_agent_findings = list(state.get("agent_findings", [])) # Đảm bảo lấy bản copy để append
+    error_messages = list(state.get("error_messages", [])) # Đảm bảo lấy bản copy
+
+    if not shared_ctx or not hasattr(shared_ctx, 'config_obj'):
+        msg = f"Config object not found for {agent_name_log}."
+        logger.error(msg)
+        error_messages.append(msg)
+        return {"agent_findings": current_agent_findings, "error_messages": error_messages}
+
+    config_obj: Config = shared_ctx.config_obj
+    ollama_client = OllamaClientWrapper(base_url=config_obj.ollama_base_url)
+    prompt_manager = PromptManager(config=config_obj)
+
     try:
-        agent_instance = agent_class(config=config_obj, ollama_client=ollama_client, prompt_manager=prompt_manager); agent_specific_input = {"files_data": files_to_review};
-        if extra_agent_input: agent_specific_input.update(extra_agent_input)
-        if agent_name_log in ["StyleGuardian", "SecuriSense"]: agent_specific_input["tier1_tool_results"] = state.get("tier1_tool_results")
-        new_findings = agent_instance.review(**agent_specific_input);
-        if isinstance(new_findings, list): current_agent_findings.extend(new_findings); logger.info(f"{agent_name_log} contributed {len(new_findings)} findings.")
-        else: msg = f"{agent_name_log} review method did not return a list."; logger.error(msg); error_messages.append(msg)
-    except NotImplementedError: msg = f"{agent_name_log} 'review' method is not implemented."; logger.warning(msg)
-    except Exception as e: msg = f"Error during {agent_name_log} execution: {e}"; logger.error(msg, exc_info=True); error_messages.append(msg)
+        agent_instance = agent_class(config=config_obj, ollama_client=ollama_client, prompt_manager=prompt_manager)
+        
+        # Chuẩn bị input cho agent.review()
+        agent_review_kwargs: Dict[str, Any] = {
+            "files_data": files_to_review,
+            "pr_context": shared_ctx # <<< THÊM NGỮ CẢNH PR VÀO ĐÂY
+        }
+
+        # Thêm tier1_tool_results nếu agent cần
+        if agent_name_log in ["StyleGuardianAgent", "SecuriSenseAgent"]: # Sử dụng tên class hoặc một định danh khác
+            agent_review_kwargs["tier1_tool_results"] = state.get("tier1_tool_results")
+        
+        # Thêm các input phụ trợ khác nếu có
+        if extra_agent_input:
+            agent_review_kwargs.update(extra_agent_input)
+            
+        # Đặc biệt cho MetaReviewer, input có thể khác
+        if agent_name_log == "MetaReviewerAgent": # Sử dụng tên class
+            agent_review_kwargs = { # Ghi đè kwargs cho MetaReviewer
+                "all_agent_findings": current_agent_findings, # MetaReviewer nhận list finding hiện tại
+                "files_data": files_to_review, # Vẫn cần files_data cho context
+                "pr_context": shared_ctx
+            }
+            # Với MetaReviewer, chúng ta muốn thay thế agent_findings, không phải append
+            # Nên kết quả sẽ được gán trực tiếp, không phải current_agent_findings.extend()
+
+        new_findings = agent_instance.review(**agent_review_kwargs)
+
+        if isinstance(new_findings, list):
+            if agent_name_log == "MetaReviewerAgent":
+                logger.info(f"{agent_name_log} processed {len(current_agent_findings)} findings, resulted in {len(new_findings)} refined findings.")
+                current_agent_findings = new_findings # Gán lại, không extend
+            else:
+                current_agent_findings.extend(new_findings)
+                logger.info(f"{agent_name_log} contributed {len(new_findings)} findings. Total now: {len(current_agent_findings)}")
+        else:
+            msg = f"{agent_name_log} review method did not return a list. Got: {type(new_findings)}"
+            logger.error(msg)
+            error_messages.append(msg)
+            
+    except NotImplementedError:
+        msg = f"{agent_name_log} 'review' method is not implemented."
+        logger.warning(msg) # Không thêm vào error_messages vì đây là lỗi cấu trúc code
+    except Exception as e:
+        msg = f"Error during {agent_name_log} execution: {e}"
+        logger.error(msg, exc_info=True)
+        error_messages.append(msg)
+        # Nếu agent lỗi, giữ nguyên current_agent_findings
+        
     return {"agent_findings": current_agent_findings, "error_messages": error_messages}
 
 def activate_style_guardian_node(state: GraphState) -> Dict[str, Any]: return _activate_agent_node(StyleGuardianAgent, "StyleGuardian", state)

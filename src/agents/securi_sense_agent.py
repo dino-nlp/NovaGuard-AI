@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from .base_agent import BaseAgent
-from ..core.shared_context import ChangedFile
+from ..core.shared_context import ChangedFile, SharedReviewContext
 from ..core.config_loader import Config
 from ..core.ollama_client import OllamaClientWrapper
 from ..core.prompt_manager import PromptManager
@@ -52,7 +52,8 @@ class SecuriSenseAgent(BaseAgent):
     def review(
         self,
         files_data: List[ChangedFile],
-        tier1_tool_results: Optional[Dict[str, Any]] = None
+        tier1_tool_results: Optional[Dict[str, Any]] = None,
+        pr_context: Optional[SharedReviewContext] = None
     ) -> List[Dict[str, Any]]:
         logger.info(f"<{self.agent_name}> Starting security scan for {len(files_data)} files.")
         all_findings: List[Dict[str, Any]] = []
@@ -60,6 +61,10 @@ class SecuriSenseAgent(BaseAgent):
         if not relevant_files:
             logger.info(f"<{self.agent_name}> No files match supported languages for security scan. Skipping.")
             return all_findings
+        
+        # Lấy thông tin PR từ pr_context
+        pr_title_for_prompt = pr_context.pr_title if pr_context and pr_context.pr_title else "Not available"
+        pr_description_for_prompt = pr_context.pr_body if pr_context and pr_context.pr_body else "Not available"
 
         for file_data in relevant_files:
             logger.debug(f"<{self.agent_name}> Scanning file: {file_data.path} (Language: {file_data.language})")
@@ -76,7 +81,25 @@ class SecuriSenseAgent(BaseAgent):
                 "file_content": file_data.content,
                 "language": file_data.language,
                 "sast_tool_feedback": sast_context_str,
-                "output_format_instructions": """Please provide your findings as a JSON list... (instructions as before)"""
+                "pr_title": pr_title_for_prompt,
+                "pr_description": pr_description_for_prompt,
+                "output_format_instructions": """Please provide your findings STRICTLY as a JSON list.
+- If multiple vulnerabilities are found, return a list of JSON objects.
+- If only one vulnerability is found, return a list containing a single JSON object.
+- If no security vulnerabilities are found (or if SAST findings appear to be false positives after your deeper analysis), return an empty JSON list: [].
+Each JSON object in the list should represent a single potential security vulnerability and have AT LEAST the following keys:
+- "line_start": integer (the line number where the vulnerability starts or is most evident)
+- "message": string (a concise description of the vulnerability and its potential impact)
+- "vulnerability_type": string (e.g., "SQLInjection", "XSS", "PathTraversal", "CWE-79", "CWE-89")
+- "explanation_steps": list_of_strings (your step-by-step reasoning explaining why this is a potential vulnerability and, if applicable, how it could be exploited)
+- "suggested_fix": string (a concrete suggestion on how to remediate the vulnerability, including secure code examples if possible)
+- "severity": string (your assessment of severity: "critical", "high", "medium", "low")
+You MAY also include these OPTIONAL keys if applicable:
+- "line_end": integer (optional, the line number where the scope of the vulnerability ends)
+- "confidence": string (optional, your confidence in this finding: "high", "medium", "low")
+- "cvss_score_v3": string (optional, if you can estimate a CVSS v3.1 score, e.g., "7.5")
+- "cwe_id": string (optional, the most relevant CWE ID, e.g., "CWE-89")
+"""
             }
             rendered_prompt = self.prompt_manager.get_prompt(prompt_template_name, prompt_variables)
             if not rendered_prompt:
@@ -95,6 +118,7 @@ class SecuriSenseAgent(BaseAgent):
                     system_message_content=system_msg, is_json_mode=True, temperature=0.3
                 )
                 # --- DEBUG LOG ---
+                logger.info(f"<{self.agent_name}>:\n>>> START PROMP <<<\n{rendered_prompt.strip()}\n>>> END PROMPT <<<")
                 logger.info(f"<{self.agent_name}> RAW LLM RESPONSE for {file_data.path}:\n>>> START LLM RESPONSE <<<\n{response_text.strip()}\n>>> END LLM RESPONSE <<<")
 
                 llm_findings_list: List[Dict] = []

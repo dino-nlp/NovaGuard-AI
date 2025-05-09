@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from ..core.config_loader import Config
 from ..core.ollama_client import OllamaClientWrapper
 from ..core.prompt_manager import PromptManager
-from ..core.shared_context import ChangedFile
+from ..core.shared_context import ChangedFile, SharedReviewContext
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +16,13 @@ class BaseAgent:
         self.prompt_manager = prompt_manager
         logger.info(f"{self.agent_name} initialized.")
 
-    def review(self, files_data: List[ChangedFile], additional_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def review(self, 
+                files_data: List[ChangedFile], 
+                tier1_tool_results: Optional[Dict[str, Any]] = None, # Thêm cho các agent cần
+                pr_context: Optional[SharedReviewContext] = None) -> List[Dict[str, Any]]:
         # This method should be overridden by subclasses
         raise NotImplementedError(f"Review method not implemented for {self.agent_name}")
+
 
     def _filter_files_by_language(self, files_data: List[ChangedFile], supported_languages: List[str]) -> List[ChangedFile]:
         """Helper to filter files based on supported languages."""
