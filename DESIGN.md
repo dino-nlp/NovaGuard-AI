@@ -315,3 +315,98 @@ LƯU Ý:
 - Viết code lần lượt và ĐẦY ĐỦ ngay từ đầu.
 Chúc may mắn và hãy tạo ra một NovaGuard AI thật ấn tượng!
 
+--- 
+## Update:
+
+Tuyệt vời! Việc NovaGuard AI đã hoạt động cơ bản trên GitHub Actions là một thành tựu lớn! Giờ là lúc chúng ta suy nghĩ về việc cải thiện và mở rộng hệ thống.
+
+Dựa trên thiết kế ban đầu và những gì chúng ta đã xây dựng, đây là một số ý tưởng nâng cấp tiềm năng, chia theo các hạng mục:
+
+**I. Cải thiện Chất lượng Review và Độ chính xác của Agent:**
+
+1.  **Tinh chỉnh Prompt Chuyên sâu (Prompt Engineering):**
+    * **Thử nghiệm nhiều biến thể prompt:** Với mỗi agent, thử các cách diễn đạt khác nhau, thay đổi lượng context, và cấu trúc output yêu cầu để xem model nào phản hồi tốt nhất với prompt nào.
+    * **Chain-of-Thought (CoT) / Reasoning Steps:** Yêu cầu LLM giải thích các bước suy luận của nó *trước khi* đưa ra finding cuối cùng. Điều này có thể cải thiện độ chính xác, đặc biệt với BugHunter và SecuriSense. Bạn có thể yêu cầu LLM output phần giải thích này (để debug) hoặc chỉ dùng nó như một bước trung gian.
+    * **Few-Shot Learning trong Prompt:** Cung cấp một vài ví dụ (examples) về code tốt/xấu và finding mong muốn ngay trong prompt để "hướng dẫn" LLM tốt hơn, đặc biệt cho các lỗi phức tạp hoặc đặc thù của dự án.
+    * **Prompt theo Ngữ cảnh Pull Request:** Tận dụng thêm thông tin từ PR (tiêu đề, mô tả, các comment trước đó nếu có) để cung cấp ngữ cảnh rộng hơn cho LLM.
+
+2.  **Nâng cấp MetaReviewerAgent (Nếu được kích hoạt):**
+    * **Confidence Scoring:** Yêu cầu các agent LLM tự đánh giá độ tin cậy (confidence score) cho mỗi finding của chúng. MetaReviewer có thể sử dụng điểm này để lọc hoặc ưu tiên.
+    * **Cross-Agent Reasoning:** Thiết kế prompt cho MetaReviewer để nó không chỉ lọc trùng lặp mà còn cố gắng tìm ra mối liên hệ giữa các finding từ các agent khác nhau (ví dụ: một lỗi style có thể làm tăng nguy cơ một lỗi logic).
+    * **Học từ Feedback (Nâng cao):** Nếu có cách thu thập phản hồi của người dùng về chất lượng finding (ví dụ, qua comment trên PR hoặc một cơ chế khác), MetaReviewer có thể được huấn luyện (fine-tune) hoặc được cung cấp các ví dụ phản hồi đó trong prompt để cải thiện.
+
+3.  **Xử lý False Positives và False Negatives:**
+    * **False Positives (Báo sai):**
+        * Cải thiện prompt để LLM cẩn trọng hơn, yêu cầu giải thích rõ ràng hơn.
+        * Cho phép người dùng đánh dấu finding là "false positive" (ví dụ qua comment trên PR với tag đặc biệt), và có thể đưa thông tin này vào các lần review sau cho cùng một đoạn code.
+    * **False Negatives (Bỏ sót):**
+        * Thử nghiệm các model LLM lớn hơn hoặc chuyên biệt hơn cho từng agent.
+        * Bổ sung thêm các rule cho tool truyền thống (ví dụ, Semgrep ruleset tùy chỉnh).
+
+4.  **Sử dụng Tool Output Hiệu quả hơn:**
+    * **Chuẩn hóa sâu hơn output của tool:** Đảm bảo rằng output từ Pylint, Semgrep, và các tool khác được chuẩn hóa thành một cấu trúc dữ liệu thật chi tiết và nhất quán trước khi đưa vào prompt cho LLM hoặc vào `SarifGenerator`. Điều này giúp LLM dễ "tiêu hóa" hơn.
+    * **Trích xuất thông tin cụ thể từ tool:** Thay vì chỉ đưa message text, cố gắng trích xuất mã lỗi (rule ID), loại lỗi, severity từ tool để LLM có thể tham chiếu chính xác hơn.
+
+**II. Mở rộng Chức năng và Tính Năng:**
+
+5.  **Thêm Agent Mới:**
+    * **DocumentationGuardian:** Kiểm tra xem code có comment và tài liệu (docstrings) đầy đủ, rõ ràng, và cập nhật không.
+    * **TestCoverageAssessor:** (Phức tạp hơn) Phân tích code thay đổi và gợi ý các test case còn thiếu hoặc cần cập nhật (có thể dựa trên việc LLM hiểu logic code).
+    * **DependencyChecker:** (Kết hợp tool) Kiểm tra các thư viện sử dụng có lỗ hổng bảo mật đã biết (ví dụ qua `pip-audit` hoặc tích hợp Snyk/Dependabot-like tool output).
+    * **AccessibilityLinter (cho Frontend):** Nếu dự án có frontend, thêm agent/tool để kiểm tra các vấn đề về accessibility (a11y).
+
+6.  **Tích hợp Comment trực tiếp vào PR:**
+    * Như đã thảo luận, hiện tại action đang dựa vào việc upload SARIF. Bạn có thể nâng cấp `action_entrypoint.py` để:
+        * Sau khi có SARIF report, tóm tắt các finding quan trọng nhất (ví dụ, các lỗi "error" hoặc "warning").
+        * Sử dụng GitHub API (với `github_token`) để đăng một comment lên Pull Request với tóm tắt đó.
+        * **Thư viện/Action hỗ trợ:** Có thể dùng thư viện `PyGithub` trong Python hoặc action như `peter-evans/create-or-update-comment` để đơn giản hóa việc này.
+        * **Lưu ý:** Cần thêm quyền `pull-requests: write` cho workflow.
+
+7.  **Hỗ trợ Auto-Fix (Có giám sát):**
+    * Với một số lỗi đơn giản (ví dụ, lỗi style, import không dùng), LLM có thể đề xuất trực tiếp đoạn code sửa lỗi.
+    * Action có thể tạo ra một suggestion patch (diff format) và comment nó vào PR, cho phép người dùng dễ dàng chấp nhận và commit. GitHub có API cho việc này.
+    * **Cảnh báo:** Tính năng này cần được thực hiện cẩn thận và luôn cần sự review của con người trước khi áp dụng.
+
+8.  **Cấu hình Linh hoạt hơn cho Rule và Severity Mapping:**
+    * Cho phép người dùng định nghĩa cách map severity của tool/LLM sang SARIF level trong file config của dự án.
+    * Cho phép người dùng bỏ qua (ignore) một số rule cụ thể của tool hoặc agent trong file config của dự án.
+
+**III. Cải thiện Hiệu năng và Trải nghiệm Người dùng:**
+
+9.  **Tối ưu hóa Thời gian Chạy:**
+    * **Chạy song song các Agent (Nếu độc lập):** LangGraph hỗ trợ chạy các node song song nếu chúng không phụ thuộc vào output của nhau. Ví dụ, StyleGuardian, BugHunter, SecuriSense, OptiTune có thể chạy song song sau khi có `files_to_review` và `tier1_tool_results`.
+    * **Caching thông minh hơn:**
+        * Cache kết quả review cho các file không thay đổi giữa các lần commit trong cùng một PR (nếu có thể).
+        * Cache các lệnh gọi LLM nếu prompt và context không đổi (LangChain có hỗ trợ caching).
+    * **Chọn model tối ưu:** Sử dụng các model nhỏ hơn, nhanh hơn cho các tác vụ không quá phức tạp nếu chất lượng vẫn đảm bảo.
+
+10. **Logging và Debugging Tốt hơn:**
+    * Thêm tùy chọn log level chi tiết hơn (ví dụ, qua input của action).
+    * Log rõ ràng input/output của từng node trong LangGraph, và từng lời gọi LLM (có thể có option để ẩn nội dung code nhạy cảm).
+    * Nếu có thể, tích hợp với LangSmith để theo dõi và debug các chain/graph của LangChain.
+
+11. **Cải thiện Output SARIF:**
+    * Đảm bảo tất cả các trường quan trọng của SARIF được điền đầy đủ và chính xác (ví dụ: `rule.helpUri`, `result.codeFlows` nếu có).
+    * Sử dụng `partialFingerprints` để giúp GitHub nhóm các lỗi tương tự tốt hơn.
+
+**IV. Mở rộng Khả năng Tích hợp:**
+
+12. **Hỗ trợ thêm LLM Provider (Ngoài Ollama):**
+    * Như trong thiết kế ban đầu, bạn có thể thêm option để kết nối đến API của OpenAI, Gemini, Anthropic, etc. Điều này yêu cầu sửa `OllamaClientWrapper` (hoặc tạo các client riêng) và thêm cấu hình model tương ứng.
+
+13. **Web UI (Nâng cao, ngoài phạm vi GitHub Action):**
+    * Nếu muốn, bạn có thể xây dựng một Web UI riêng để hiển thị lịch sử review, thống kê, cấu hình rule, v.v. Action có thể gửi dữ liệu đến một backend API cho UI này.
+
+**Bắt đầu từ đâu?**
+
+Với nhiều ý tưởng như vậy, đây là một vài gợi ý về thứ tự ưu tiên:
+
+1.  **Ưu tiên hàng đầu: Hoàn thiện và ổn định chất lượng parsing JSON từ LLM.** Đây là nền tảng. Nếu LLM trả về cấu trúc khác nữa, bạn cần có cơ chế xử lý linh hoạt hoặc prompt mạnh mẽ hơn.
+    * In ra toàn bộ `response_text` của **tất cả các agent** để xem output thô của `qwen2.5:7b` (hoặc model bạn chọn) cho từng loại prompt.
+    * Điều chỉnh logic parsing trong từng agent cho phù hợp với output thực tế đó.
+
+2.  **Tinh chỉnh Prompt:** Sau khi parse được JSON, hãy tập trung vào việc cải thiện chất lượng nội dung của các finding bằng cách tinh chỉnh prompt.
+3.  **Tích hợp Comment trực tiếp vào PR:** Đây là một tính năng giá trị cao cho người dùng.
+4.  **Tối ưu hóa thời gian chạy:** Xem xét việc chạy song song các agent độc lập.
+
+Hãy chọn một vài điểm bạn thấy hứng thú và quan trọng nhất để bắt đầu. Chúc bạn thành công với việc nâng cấp NovaGuard AI!
