@@ -8,11 +8,11 @@ modes:
   production:
     # Model cho môi trường production - ưu tiên độ chính xác cao
     agents:
-      StyleGuardian: "starcoder2:instruct"
-      BugHunter: "starcoder2:instruct"
-      SecuriSense: "starcoder2:instruct" # Có thể dùng model lớn hơn cho security
-      OptiTune: "starcoder2:instruct"
-      MetaReviewer: "starcoder2:instruct" # Hoặc một model lớn hơn như Mixtral nếu cần context dài
+      StyleGuardian: "codellama:7b-instruct-q4_K_M"
+      BugHunter: "codellama:7b-instruct-q4_K_M"
+      SecuriSense: "codellama:7b-instruct-q4_K_M" # Có thể dùng model lớn hơn cho security
+      OptiTune: "codellama:7b-instruct-q4_K_M"
+      MetaReviewer: "codellama:7b-instruct-q4_K_M" # Hoặc một model lớn hơn như Mixtral nếu cần context dài
     # tasks: # (Tùy chọn)
       # summarize_findings_long: "mixtral:8x7b-instruct-v0.1-q4_K_M"
 
@@ -21,11 +21,11 @@ modes:
     # Đảm bảo các model này đã được pull về Ollama server của bạn.
     # Ví dụ các model nhỏ, nhanh (tên model có thể thay đổi tùy theo Ollama và các model bạn có):
     agents:
-      StyleGuardian: "starcoder2:instruct" # Hoặc "phi:2.7b-chat-v2-q4_K_M" nếu bạn đã pull phi-2
-      BugHunter: "starcoder2:instruct" # Phi-2 khá tốt cho code tasks nhỏ
-      SecuriSense: "starcoder2:instruct"
-      OptiTune: "starcoder2:instruct"
-      MetaReviewer: "starcoder2:instruct" # Hoặc một model nhỏ khác
+      StyleGuardian: "codellama:7b-instruct-q4_K_M" # Hoặc "phi:2.7b-chat-v2-q4_K_M" nếu bạn đã pull phi-2
+      BugHunter: "codellama:7b-instruct-q4_K_M" # Phi-2 khá tốt cho code tasks nhỏ
+      SecuriSense: "codellama:7b-instruct-q4_K_M"
+      OptiTune: "codellama:7b-instruct-q4_K_M"
+      MetaReviewer: "codellama:7b-instruct-q4_K_M" # Hoặc một model nhỏ khác
     # tasks:
       # summarize_findings_long: "orca-mini:3b-v3-q4_K_M"
 
