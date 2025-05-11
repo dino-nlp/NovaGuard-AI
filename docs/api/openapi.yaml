@@ -1,0 +1,442 @@
+# docs/api/openapi.yaml (Sẽ được cập nhật và chi tiết hóa)
+openapi: 3.1.0
+info:
+  title: NovaGuard-AI API
+  version: v0.1.0-mvp1
+  description: API for NovaGuard-AI - Intelligent Code Analysis Platform (MVP1)
+
+servers:
+  - url: http://localhost:8000/api/v1 # Base URL for local development (API Gateway)
+    description: Local Development Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # User Schemas
+    UserCreate:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    UserLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    Token:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        github_user_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # Project Schemas
+    ProjectCreate:
+      type: object
+      required:
+        - github_repo_id
+        - repo_name # e.g., "owner/repo-name"
+        - main_branch
+      properties:
+        github_repo_id:
+          type: string
+        repo_name:
+          type: string
+        main_branch:
+          type: string
+        language:
+          type: string
+          nullable: true
+        custom_project_notes:
+          type: string
+          nullable: true
+    ProjectUpdate:
+      type: object
+      properties:
+        language:
+          type: string
+          nullable: true
+        custom_project_notes:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+    ProjectResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        github_repo_id:
+          type: string
+        repo_name:
+          type: string
+        main_branch:
+          type: string
+        language:
+          type: string
+          nullable: true
+        custom_project_notes:
+          type: string
+          nullable: true
+        github_webhook_id:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # PR Analysis Schemas
+    PRAnalysisRequestResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        project_id:
+          type: integer
+        github_pr_number:
+          type: integer
+        pr_title:
+          type: string
+          nullable: true
+        pr_github_url:
+          type: string
+          nullable: true
+        head_sha:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        error_message:
+          type: string
+          nullable: true
+        requested_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AnalysisFindingResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        pr_analysis_request_id:
+          type: integer
+        file_path:
+          type: string
+        line_start:
+          type: integer
+          nullable: true
+        line_end:
+          type: integer
+          nullable: true
+        severity:
+          type: string
+          enum: [Error, Warning, Note, Info]
+        message:
+          type: string
+        suggestion:
+          type: string
+          nullable: true
+        agent_name:
+          type: string
+          nullable: true
+        user_feedback:
+          type: string
+          enum: [Helpful, Not Helpful, Uncategorized]
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PRAnalysisReportResponse:
+      type: object
+      properties:
+        pr_details:
+          $ref: '#/components/schemas/PRAnalysisRequestResponse'
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalysisFindingResponse'
+
+    # Webhook Schemas
+    GitHubWebhookPayload: # Simplified, actual payload is complex
+      type: object
+      # Define properties based on GitHub's 'pull_request' event payload
+      # e.g., action, number, pull_request.head.sha, repository.id, etc.
+
+paths:
+  # Auth Service
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid input or user already exists
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '401':
+          description: Unauthorized
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout a user (server-side token invalidation if applicable)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+  /auth/github:
+    get:
+      tags: [Auth]
+      summary: Redirect to GitHub for OAuth authentication
+      responses:
+        '302':
+          description: Redirect to GitHub OAuth page
+  /auth/github/callback:
+    get:
+      tags: [Auth]
+      summary: GitHub OAuth callback URL
+      # Parameters will include 'code' and 'state' from GitHub
+      responses:
+        '200':
+          description: GitHub OAuth successful, token stored, returns JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '400':
+          description: Error during GitHub OAuth
+
+  # Project Service
+  /projects:
+    post:
+      tags: [Project]
+      summary: Add a new project
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        '201':
+          description: Project added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          description: Invalid input or project already exists for user
+    get:
+      tags: [Project]
+      summary: Get list of projects for the current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectResponse'
+  /projects/{project_id}:
+    get:
+      tags: [Project]
+      summary: Get details of a specific project
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '404':
+          description: Project not found
+    put:
+      tags: [Project]
+      summary: Update project settings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+      responses:
+        '200':
+          description: Project updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '404':
+          description: Project not found
+  /projects/{project_id}/prs:
+    get:
+      tags: [Project, PR Analysis]
+      summary: Get list of PRs analyzed for a project
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of PR analysis requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PRAnalysisRequestResponse'
+        '404':
+          description: Project not found
+
+  # Report Service (can be part of Project Service or separate)
+  /projects/{project_id}/prs/{pr_number}/report: # Or use pr_analysis_request_id
+    get:
+      tags: [PR Analysis, Report]
+      summary: Get analysis report for a specific PR
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: pr_number # GitHub PR number
+          in: path
+          required: true
+          schema:
+            type: integer
+        # Could also add 'sha' parameter to get report for a specific commit within the PR
+      responses:
+        '200':
+          description: PR Analysis Report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PRAnalysisReportResponse'
+        '404':
+          description: Project or PR analysis not found
+
+  # Webhook Service
+  /webhooks/github:
+    post:
+      tags: [Webhook]
+      summary: Endpoint to receive GitHub webhooks (for PR events)
+      # This endpoint needs to verify GitHub's signature
+      requestBody:
+        required: true
+        content:
+          application/json: # GitHub sends JSON payloads
+            schema:
+              $ref: '#/components/schemas/GitHubWebhookPayload' # Define this more accurately
+      responses:
+        '202': # Accepted for processing
+          description: Webhook received and accepted for processing
+        '400':
+          description: Invalid payload or signature mismatch
+        '401':
+          description: Unauthorized (e.g., invalid signature)

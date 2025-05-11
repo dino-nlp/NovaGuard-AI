@@ -1,412 +1,272 @@
+# Design NOVAGUARD AI 2.0
+
+## Bản Thiết kế Dự án: NovaGuard-AI 2.0 – Nền tảng Phân tích Code Thông minh và Chuyên sâu
+
+**Phiên bản:** 2.0
+**Ngày cập nhật:** 12 tháng 5 năm 2025
+**Định hướng chính:** Chuyển đổi từ GitHub Action sang một nền tảng website độc lập, cung cấp khả năng phân tích code chuyên sâu, hiểu biết toàn diện về dự án, và tận dụng tối đa sức mạnh của LLM để đưa ra những insight giá trị, khác biệt.
+
+**I. Tổng quan và Tầm nhìn**
+
+NovaGuard-AI 2.0 là một nền tảng website tiên tiến, được thiết kế để trở thành người đồng hành không thể thiếu của các đội nhóm phát triển phần mềm. Mục tiêu của NovaGuard-AI 2.0 là cung cấp những phân tích code tự động, thông minh, và chuyên sâu vượt xa các công cụ review truyền thống. Bằng cách hiểu toàn bộ ngữ cảnh của một dự án – từ kiến trúc tổng thể, luồng logic nghiệp vụ, đến các coding convention đặc thù – NovaGuard-AI 2.0 giúp phát hiện các vấn đề tiềm ẩn, cải thiện chất lượng thiết kế, nâng cao khả năng bảo trì, và giảm thiểu rủi ro trong quá trình phát triển phần mềm.
+
+**II. Đối tượng Người dùng Mục tiêu**
+
+* **Đội nhóm Phát triển Phần mềm:** (Mọi quy mô) Tìm kiếm công cụ review code tự động hiệu quả, giảm thời gian review thủ công, nâng cao chất lượng code.
+* **Kiến trúc sư Phần mềm & Tech Leads:** Cần công cụ để đánh giá và duy trì sự tuân thủ kiến trúc, phát hiện sớm các "architectural smells" và nợ kỹ thuật.
+* **Nhà Quản lý Kỹ thuật/Sản phẩm:** Muốn theo dõi "sức khỏe" code của dự án, chất lượng đầu ra của đội ngũ, và đưa ra quyết định dựa trên dữ liệu.
+* **Lập trình viên Cá nhân:** Muốn nhận được những phản hồi sâu sắc để cải thiện kỹ năng và chất lượng code cá nhân.
+
+**III. Kiến trúc Hệ thống Tổng thể**
+
+NovaGuard-AI 2.0 sẽ được xây dựng theo kiến trúc microservices hoặc module hóa cao để đảm bảo khả năng mở rộng và bảo trì.
+
+1.  **Frontend (Ứng dụng Web Đơn Trang - SPA):**
+    * Giao diện người dùng chính, nơi người dùng tương tác với hệ thống.
+    * Chức năng: Đăng ký/Đăng nhập, quản lý profile, thêm/quản lý dự án, xem dashboard, cấu hình dự án, xem chi tiết báo cáo phân tích, tương tác với kết quả review.
+    * Công nghệ gợi ý: React/Vue/Angular với TypeScript.
+
+2.  **Backend API Gateway:**
+    * Điểm vào duy nhất cho tất cả các yêu cầu từ frontend.
+    * Chức năng: Xác thực request, định tuyến đến các service phù hợp, tổng hợp response.
+    * Công nghệ gợi ý: FastAPI (Python), NestJS (Node.js).
+
+3.  **Core Analysis Engine (Hệ thống Phân tích Lõi – Backend):**
+    * **Project Manager Service:**
+        * Xử lý việc kết nối với các nền tảng quản lý source code (ban đầu là GitHub).
+        * Lấy thông tin dự án, clone/fetch source code.
+        * Quản lý thông tin xác thực (ví dụ: GitHub App tokens).
+    * **Webhook Handler Service:**
+        * Tiếp nhận và xử lý các sự kiện webhook từ GitHub (ví dụ: PR được tạo/cập nhật, push lên nhánh chính).
+        * Kích hoạt các tác vụ phân tích tương ứng.
+    * **Analysis Orchestrator Service (Dựa trên LangGraph & MCP):**
+        * "Bộ não" điều phối toàn bộ quy trình phân tích code.
+        * Quản lý `DynamicProjectContext` và `Code Knowledge Graph (CKG)`.
+        * Bao gồm các node chính:
+            * `InitializeContextNode`: Khởi tạo `DynamicProjectContext` ban đầu.
+            * `CodeGraphBuilderNode`: Xây dựng và cập nhật CKG từ source code.
+            * `ContextEnrichmentNode`: Làm giàu `DynamicProjectContext` bằng thông tin từ CKG, cấu hình dự án, và các nguồn khác.
+            * Các **Agent Chuyên sâu** (xem mục VI).
+            * `MetaReviewerAgent`: Tổng hợp, lọc, và ưu tiên các phát hiện từ các agent, sử dụng `DynamicProjectContext` để đánh giá.
+            * `ReportGeneratorService`: Tạo các báo cáo phân tích chi tiết cho frontend.
+    * **LLM Service Wrapper:**
+        * Giao tiếp với các LLM (ban đầu là Ollama chạy local, có thể mở rộng sang các API như Gemini, OpenAI nếu người dùng cấu hình).
+        * Quản lý prompt, retry, xử lý lỗi.
+    * **Static Analysis Tools Integrator:**
+        * Tích hợp và thực thi các công cụ phân tích tĩnh truyền thống (linters, SAST tools). Kết quả từ các tool này sẽ là một phần đầu vào cho `ContextEnrichmentNode` và các agent LLM.
+
+4.  **Data Persistence Layer (Lớp Lưu trữ Dữ liệu):**
+    * **Relational Database (ví dụ: PostgreSQL):**
+        * Lưu trữ thông tin người dùng, dự án, cấu hình dự án, tóm tắt kết quả review, trạng thái tác vụ phân tích, lịch sử webhook.
+    * **Graph Database (Ví dụ: Neo4j - Rất khuyến khích cho CKG):**
+        * Lưu trữ và cho phép truy vấn hiệu quả Code Knowledge Graph (CKG) của các dự án.
+    * **Vector Database (Ví dụ: ChromaDB, Weaviate):**
+        * Lưu trữ semantic embeddings của các đoạn code, file, module để hỗ trợ tìm kiếm ngữ nghĩa và làm giàu context.
+    * **Object Storage (Ví dụ: MinIO, AWS S3):**
+        * Lưu trữ các file source code đã clone, các báo cáo SARIF (nếu vẫn dùng), các file log lớn, cache dữ liệu phân tích.
+
+5.  **Job Queue & Worker System (Hàng đợi Tác vụ & Hệ thống Worker):**
+    * **Message Queue (Ví dụ: RabbitMQ, Kafka):**
+        * Quản lý các tác vụ phân tích code (đặc biệt là "Scan Toàn bộ Dự án" và "Review PR" có thể tốn thời gian) để xử lý bất đồng bộ, tránh block request từ người dùng.
+    * **Worker Processes:**
+        * Các tiến trình độc lập (có thể scale) lắng nghe tác vụ từ message queue và thực thi các pipeline của `Analysis Orchestrator Service`.
+
+6.  **Authentication & Authorization Service:**
+    * Quản lý việc đăng ký, đăng nhập (hỗ trợ đăng nhập qua GitHub OAuth).
+    * Quản lý quyền truy cập của người dùng đối với các dự án và tính năng.
+
+**IV. Model Context Protocol (MCP) và Code Knowledge Graph (CKG)**
+
+Đây là hai thành phần cốt lõi giúp NovaGuard-AI 2.0 hiểu sâu về dự án:
+
+1.  **`DynamicProjectContext` (Pydantic Model hoặc tương đương):**
+    * Một đối tượng động, chứa toàn bộ thông tin ngữ cảnh liên quan đến một phiên phân tích cụ thể (cho PR hoặc toàn bộ dự án).
+    * Bao gồm: Thông tin PR/commit, danh sách file thay đổi, nội dung file, metadata dự án, cấu trúc thư mục, tóm tắt các module quan trọng, coding conventions, design patterns của dự án (từ cấu hình hoặc suy luận), thông tin từ CKG, các phát hiện từ agent trước đó.
+    * Được khởi tạo bởi `InitializeContextNode` và làm giàu liên tục bởi `ContextEnrichmentNode` và `CodeGraphBuilderNode`.
+
+2.  **Code Knowledge Graph (CKG):**
+    * Một biểu đồ tri thức biểu diễn các thực thể trong source code (files, classes, functions, methods, variables, interfaces, modules, API endpoints, database schemas, data flows, business logic units...) và các mối quan hệ đa dạng giữa chúng (gọi, kế thừa, hiện thực hóa, sử dụng, sửa đổi, phụ thuộc, tạo ra, tiêu thụ...).
+    * **Xây dựng và Cập nhật:**
+        * Sử dụng kết hợp AST parsing (ví dụ: `tree-sitter`), phân tích luồng dữ liệu tĩnh, và có thể cả LLM để trích xuất thực thể và mối quan hệ.
+        * CKG nền tảng được xây dựng khi "Scan Toàn bộ Dự án" và được cập nhật gia tăng khi có thay đổi mới (ví dụ: qua PR).
+    * **Lưu trữ:** Ưu tiên Graph Database (Neo4j) để truy vấn hiệu quả.
+    * **Sử dụng:** Các agent chuyên sâu sẽ truy vấn CKG để hiểu rõ hơn về tác động của thay đổi, luồng dữ liệu, các phụ thuộc ẩn, và ngữ cảnh kiến trúc.
+
+3.  **Semantic Code Embeddings:**
+    * Các đoạn code, function, class, file sẽ được nhúng thành vector ngữ nghĩa.
+    * Lưu trữ trong Vector Database.
+    * Sử dụng để tìm kiếm các đoạn code tương tự, các module liên quan về mặt ngữ nghĩa, giúp làm giàu `DynamicProjectContext` và hỗ trợ các agent.
+
+**V. Các Tính năng Chính của Nền tảng Website NovaGuard-AI 2.0**
+
+1.  **Quản lý Người dùng & Xác thực:**
+    * Đăng ký tài khoản mới.
+    * Đăng nhập (email/password và tùy chọn "Sign in with GitHub").
+    * Quản lý thông tin cá nhân.
+
+2.  **Quản lý Dự án:**
+    * **Thêm Dự án Mới:**
+        * Kết nối với tài khoản GitHub của người dùng.
+        * Cho phép chọn repository (private hoặc public nếu được cấp quyền).
+        * Chọn nhánh chính để theo dõi.
+        * (Sau khi thêm) NovaGuard-AI sẽ thực hiện một lần "Scan Toàn bộ Dự án" ban đầu để xây dựng CKG nền tảng.
+    * **Dashboard Dự án:**
+        * Hiển thị tổng quan "sức khỏe" code (ví dụ: điểm chất lượng, số lượng vấn đề nghiêm trọng, xu hướng theo thời gian).
+        * Danh sách các Pull Request gần đây và trạng thái review của NovaGuard-AI.
+        * Lịch sử các lần "Scan Toàn bộ Dự án".
+        * Truy cập nhanh vào cấu hình dự án.
+
+3.  **Tính năng "Scan Toàn bộ Dự án" (Full Project Scan):**
+    * **Kích hoạt:** Người dùng có thể trigger thủ công bất cứ lúc nào hoặc thiết lập lịch quét định kỳ (ví dụ: hàng đêm, hàng tuần).
+    * **Quy trình:**
+        1.  Checkout/Fetch phiên bản mới nhất của nhánh chính.
+        2.  `CodeGraphBuilderNode` xây dựng hoặc cập nhật toàn bộ CKG của dự án.
+        3.  `ContextEnrichmentNode` làm giàu `DynamicProjectContext` cho toàn bộ dự án.
+        4.  Tất cả các **Agent Chuyên sâu** được kích hoạt để phân tích toàn bộ codebase dựa trên CKG và `DynamicProjectContext`.
+        5.  `ReportGeneratorService` tạo báo cáo tổng thể.
+    * **Hiển thị Báo cáo:**
+        * Các vấn đề kiến trúc lớn (ví dụ: vi phạm SOLID, module quá lớn, coupling cao).
+        * Danh sách nợ kỹ thuật (technical debt) được định lượng và ưu tiên.
+        * Các "hotspot" về lỗi tiềm ẩn, lỗ hổng bảo mật, vấn đề hiệu năng trên toàn dự án.
+        * (Nâng cao) Giao diện trực quan hóa một phần CKG, làm nổi bật các khu vực có vấn đề.
+
+4.  **Tính năng "Review Pull Request Tự động" (Automated PR Review):**
+    * **Kích hoạt:** Tự động khi có PR mới được tạo hoặc cập nhật trên GitHub (thông qua webhook).
+    * **Quy trình:**
+        1.  Webhook Handler nhận sự kiện, gửi tác vụ vào Message Queue.
+        2.  Worker lấy thông tin PR, code diff.
+        3.  `CodeGraphBuilderNode` cập nhật CKG một cách gia tăng cho các phần code bị thay đổi và các thành phần liên quan trực tiếp (sử dụng CKG nền tảng đã có).
+        4.  `ContextEnrichmentNode` xây dựng `DynamicProjectContext` cho phạm vi PR, dựa trên diff và thông tin từ CKG.
+        5.  Các **Agent Chuyên sâu** được kích hoạt để phân tích các thay đổi trong PR và tác động của chúng.
+        6.  `ReportGeneratorService` tạo báo cáo chi tiết cho PR.
+    * **Hiển thị Báo cáo và Tích hợp GitHub:**
+        * Kết quả review chi tiết được hiển thị trên một trang riêng của PR đó trên website NovaGuard-AI.
+        * Một comment tóm tắt (với link đến báo cáo chi tiết) được tự động đăng lên PR trên GitHub.
+        * (Tùy chọn) Cập nhật status check của PR trên GitHub.
+
+5.  **Trang Chi tiết Review/Phát hiện:**
+    * Mô tả chi tiết vấn đề được phát hiện.
+    * Đoạn code liên quan được highlight.
+    * Giải thích rõ ràng "Tại sao" đây là một vấn đề (dựa trên CKG, nguyên lý thiết kế, coding convention của dự án, hoặc suy luận của LLM).
+    * Gợi ý các giải pháp khắc phục, có thể kèm theo ví dụ code.
+    * Hiển thị "Dấu vết Suy luận" (Reasoning Trace) của LLM (nếu có, giúp tăng tính minh bạch).
+    * Chức năng cho người dùng:
+        * Thêm bình luận, thảo luận.
+        * Đánh dấu: "Đã giải quyết", "Sai (False Positive)", "Sẽ xem xét sau".
+        * Cung cấp phản hồi về chất lượng của gợi ý.
+
+6.  **Quản lý Cấu hình Dự án (qua Giao diện Web):**
+    * Chọn/Cấu hình các model LLM cho từng agent hoặc tác vụ.
+    * Bật/Tắt các Agent phân tích.
+    * Định nghĩa các Coding Conventions và Architectural Rules riêng của dự án (ví dụ: "Không cho phép circular dependencies giữa các module X, Y, Z", "Tất cả các service phải implement interface LoggingService"). Các quy tắc này sẽ được MCP và các agent sử dụng.
+    * Thiết lập "Độ sâu" và "Phạm vi" phân tích (ví dụ: các chế độ "Nhanh & Tập trung PR", "Cân bằng", "Sâu & Toàn diện").
+    * Quản lý danh sách các tool phân tích tĩnh tích hợp và cấu hình của chúng.
+
+7.  **(Nâng cao) Theo dõi Nợ Kỹ thuật (Technical Debt Tracking):**
+    * NovaGuard-AI có thể giúp nhận diện, phân loại, và ước tính nợ kỹ thuật.
+    * Dashboard hiển thị xu hướng nợ kỹ thuật theo thời gian.
+
+8.  **(Nâng cao) Knowledge Base Riêng cho Dự án:**
+    * Cho phép người dùng lưu trữ các quyết định thiết kế quan trọng, lý do tại sao một số cảnh báo được coi là false positive trong ngữ cảnh dự án của họ.
+    * MCP và các agent có thể tham khảo knowledge base này để đưa ra phân tích phù hợp hơn.
+
+**VI. Các Agent Chuyên sâu trong NovaGuard-AI 2.0**
+
+Các agent này sẽ là trái tim của khả năng phân tích chuyên sâu, tận dụng `DynamicProjectContext` và CKG.
+
+1.  **`DeepLogicBugHunterAI`:**
+    * **Nhiệm vụ:** Phát hiện các lỗi logic phức tạp, race conditions, deadlocks, null pointer exceptions tinh vi, resource leaks, các vấn đề về quản lý state, lỗi trong xử lý bất đồng bộ, và các lỗi chỉ xuất hiện khi có sự tương tác phức tạp giữa nhiều thành phần (dựa trên CKG).
+    * **Kỹ thuật:** Sử dụng LLM với prompt được thiết kế để suy luận sâu về luồng thực thi, các trường hợp biên, và tương tác dữ liệu. Có thể sử dụng CoT/ToT.
+
+2.  **`ArchitecturalAnalystAI`:**
+    * **Nhiệm vụ:** Phân tích các vấn đề về thiết kế và kiến trúc phần mềm.
+        * Vi phạm các nguyên lý thiết kế phổ quát (SOLID, DRY, GRASP...).
+        * Phát hiện các architectural smells và anti-patterns (ví dụ: God Class/Module, Spaghetti Code, Lava Flow, Data Clumps, Feature Envy) trong ngữ cảnh cụ thể của dự án.
+        * Đánh giá tính module hóa, mức độ coupling (liên kết) và cohesion (gắn kết) của các thành phần.
+        * Đề xuất các refactoring ở mức độ kiến trúc để cải thiện khả năng bảo trì, mở rộng, và kiểm thử.
+        * Kiểm tra sự tuân thủ các quy tắc kiến trúc đã được người dùng định nghĩa cho dự án.
+    * **Kỹ thuật:** Truy vấn CKG để hiểu cấu trúc và mối quan hệ. LLM được cung cấp kiến thức về các nguyên lý và pattern, sau đó áp dụng vào `DynamicProjectContext`.
+
+3.  **`SecuritySentinelAI`:**
+    * **Nhiệm vụ:** Phát hiện các lỗ hổng bảo mật chuyên sâu, vượt ra ngoài khả năng của các tool SAST truyền thống.
+        * Phân tích luồng dữ liệu nhạy cảm (dựa trên CKG) để tìm các điểm rò rỉ hoặc xử lý không an toàn.
+        * Phát hiện các lỗ hổng logic trong việc kiểm soát truy cập, xác thực, ủy quyền.
+        * Cố gắng xác định các mẫu tấn công mới hoặc các biến thể của các lỗ hổng đã biết (OWASP Top 10+) dựa trên ngữ cảnh code.
+        * Sàng lọc và xác minh lại các phát hiện từ tool SAST, giảm false positives bằng cách hiểu ngữ cảnh.
+    * **Kỹ thuật:** Kết hợp output từ SAST tool, phân tích CKG, và LLM có khả năng suy luận về an ninh mạng.
+
+4.  **`PerformanceProfilerAI` (Nâng cấp từ `OptiTuneAI`):**
+    * **Nhiệm vụ:** Phát hiện các điểm nghẽn hiệu năng tiềm ẩn trong code, các thuật toán không hiệu quả, việc sử dụng tài nguyên lãng phí, hoặc các pattern có thể dẫn đến vấn đề về performance dưới tải nặng.
+    * **Kỹ thuật:** Phân tích cấu trúc code (ví dụ: vòng lặp lồng nhau phức tạp xử lý dữ liệu lớn), truy vấn CKG để hiểu các đường dẫn thực thi thường xuyên hoặc tốn kém. LLM được cung cấp kiến thức về các anti-pattern hiệu năng. (Lưu ý: Phân tích hiệu năng tĩnh rất khó, agent này sẽ tập trung vào các *nguy cơ* tiềm ẩn hơn là đo đạc chính xác).
+
+5.  **`StyleGuardianAgent` (Vai trò Giảm nhẹ/Tùy chọn):**
+    * **Nhiệm vụ:** Đảm bảo code tuân thủ các quy ước về style cơ bản để dễ đọc và nhất quán, giúp các agent khác phân tích hiệu quả hơn. Không tập trung vào các lỗi style vụn vặt nếu đã có linter mạnh.
+    * **Kỹ thuật:** Có thể chạy linter truyền thống và dùng LLM để giải thích hoặc nhóm các lỗi style quan trọng.
+
+**VII. Công nghệ Đề xuất**
+
+* **Frontend:** React / Vue.js / Angular (sử dụng TypeScript).
+* **Backend API Gateway & Microservices:** Python (FastAPI, Flask/Django), Node.js (NestJS, Express), hoặc Golang. Python được ưu tiên cho các service liên quan đến AI/ML.
+* **LLM Orchestration:** Langchain / LangGraph (Python).
+* **LLM Runtime:** Ollama (cho các model local), hoặc tích hợp với các API LLM (Gemini, OpenAI).
+* **Relational Database:** PostgreSQL.
+* **Graph Database (cho CKG):** Neo4j (khuyến nghị cao).
+* **Vector Database (cho Semantic Embeddings):** ChromaDB, Weaviate, FAISS (tích hợp).
+* **Message Queue:** RabbitMQ / Kafka.
+* **AST Parsing:** `tree-sitter`.
+* **Containerization & Orchestration:** Docker, Kubernetes.
+
+**VIII. Quy trình Làm việc Tổng quan của Người dùng**
+
+1.  **Đăng ký/Đăng nhập** vào Nền tảng NovaGuard-AI.
+2.  **Kết nối Tài khoản GitHub** (OAuth).
+3.  **Thêm một Dự án Mới:** Chọn repository từ danh sách, chọn nhánh chính.
+    * *NovaGuard-AI thực hiện "Scan Toàn bộ Dự án" lần đầu để xây dựng CKG nền tảng.*
+4.  **Xem Dashboard Dự án:** Theo dõi "sức khỏe" code, các vấn đề nổi bật.
+5.  **Cấu hình Dự án:** Tùy chỉnh các agent, quy tắc, model LLM cho phù hợp.
+6.  **Khi Lập trình viên tạo/cập nhật Pull Request trên GitHub:**
+    * NovaGuard-AI tự động nhận diện (qua webhook).
+    * Thực hiện "Review PR Tự động".
+    * Đăng comment tóm tắt lên PR GitHub với link tới báo cáo chi tiết trên NovaGuard-AI.
+7.  **Xem Báo cáo Review Chi tiết** trên NovaGuard-AI, thảo luận, cung cấp feedback.
+8.  **Khắc phục code và push commit mới lên PR.**
+    * *NovaGuard-AI có thể tự động re-scan PR (nếu được cấu hình).*
+9.  **Định kỳ hoặc theo yêu cầu, thực hiện "Scan Toàn bộ Dự án"** để kiểm tra nợ kỹ thuật và các vấn đề kiến trúc tổng thể.
+
+**IX. Mô hình Triển khai (Gợi ý)**
+
+* **Giai đoạn đầu:** Có thể tập trung vào mô hình **SaaS** để người dùng dễ dàng tiếp cận và sử dụng. Cần chiến lược bảo mật dữ liệu và code của khách hàng cực kỳ nghiêm ngặt.
+* **Lộ trình dài hạn:** Cung cấp tùy chọn **On-Premise/Self-Hosted** cho các doanh nghiệp lớn có yêu cầu bảo mật cao hoặc muốn tích hợp sâu vào hạ tầng nội bộ.
+
+**X. Lộ trình Phát triển Gợi ý (Các Giai đoạn Chính)**
+
+1.  **MVP 1 (Nền tảng Cơ bản & Review PR Thông minh):**
+    * Xác thực người dùng, kết nối GitHub, thêm dự án.
+    * "Review PR Tự động" với 2-3 Agent chuyên sâu (ví dụ: `DeepLogicBugHunterAI`, `ArchitecturalAnalystAI` ở mức cơ bản). MCP và CKG ở mức độ đơn giản, tập trung vào ngữ cảnh trực tiếp của PR và các file liên quan.
+    * Hiển thị báo cáo review chi tiết trên web.
+    * Giao diện cấu hình dự án cơ bản.
+    * Hạ tầng backend cốt lõi (API, Worker, DB cơ bản).
+
+2.  **MVP 2 (Scan Toàn bộ Dự án & CKG Nền tảng):**
+    * Triển khai tính năng "Scan Toàn bộ Dự án".
+    * Xây dựng phiên bản đầu tiên của Code Knowledge Graph (CKG) một cách đầy đủ hơn.
+    * Cải thiện Dashboard dự án với các chỉ số từ scan toàn bộ.
+    * Nâng cấp các Agent để tận dụng CKG nền tảng.
+
+3.  **Phiên bản Tiếp theo (Hoàn thiện và Mở rộng):**
+    * Hoàn thiện và tối ưu hóa CKG, trực quan hóa CKG.
+    * Thêm/Nâng cấp các Agent chuyên sâu.
+    * Cải thiện trải nghiệm người dùng (UX/UI) dựa trên feedback.
+    * Triển khai các tính năng nâng cao: Theo dõi nợ kỹ thuật, Knowledge Base riêng của dự án, gợi ý học tập.
+    * Hỗ trợ thêm các nền tảng quản lý source code khác (GitLab, Bitbucket).
+    * Nghiên cứu mô hình On-Premise.
+
+**XI. Rủi ro và Thách thức Chính**
+
+* **Độ phức tạp Kỹ thuật:** Xây dựng CKG, các agent LLM thông minh, và một nền tảng web ổn định, có khả năng mở rộng là một thách thức lớn.
+* **Bảo mật Dữ liệu và Code:** Ưu tiên hàng đầu, đặc biệt với mô hình SaaS.
+* **Hiệu năng và Chi phí Hạ tầng:** Phân tích sâu có thể tốn nhiều tài nguyên. Cần tối ưu hóa và cân nhắc chi phí vận hành.
+* **Chất lượng của LLM và Prompt Engineering:** Chất lượng phân tích phụ thuộc rất nhiều vào khả năng của model LLM được chọn và nghệ thuật thiết kế prompt. Cần thử nghiệm và tinh chỉnh liên tục.
+* **Trải nghiệm Người dùng (UX/UI):** Phải đảm bảo người dùng có thể dễ dàng hiểu và hành động dựa trên các phân tích chuyên sâu mà không cảm thấy bị quá tải thông tin.
+* **Độ chính xác và Giảm False Positives:** Cần cơ chế feedback mạnh mẽ để hệ thống ngày càng "học" và trở nên chính xác hơn.
 
-## Báo cáo Dự án: NovaGuard AI – Người Đồng Hành Review Code Thông Minh Của Bạn
-
-**Ngày:** 7 tháng 5 năm 2025
-
-**Tầm nhìn:** Trao quyền cho các nhóm phát triển bằng một hệ thống review code tự động, thông minh, bảo mật và tùy biến cao, giúp nâng cao chất lượng mã nguồn, tăng tốc độ phát triển và giảm thiểu rủi ro.
-
-**Mục tiêu Dự án:**
-Xây dựng một GitHub Action tiên tiến, sử dụng hệ thống Đa Agent Lai (Hybrid Multi-Agent System) kết hợp sức mạnh của các công cụ phân tích tĩnh truyền thống và các mô hình ngôn ngữ lớn (LLM) thế hệ mới nhất (thông qua Ollama, chạy trên máy local). Hệ thống này sẽ tự động review merge request, đưa ra những nhận xét, cảnh báo và gợi ý cải thiện code một cách toàn diện và dễ hiểu.
-
-**Vấn đề Cốt lõi Giải quyết:**
-* **Thời gian review thủ công kéo dài:** Giảm tải cho các senior developer, để họ tập trung vào các vấn đề kiến trúc phức tạp hơn.
-* **Bỏ sót lỗi tiềm ẩn:** Con người dễ bỏ sót lỗi, đặc biệt là các side effect tinh vi hoặc lỗ hổng bảo mật ít gặp.
-* **Thiếu nhất quán trong review:** Đảm bảo các tiêu chuẩn code và chất lượng được áp dụng đồng đều.
-* **Rào cản kiến thức:** Không phải ai cũng là chuyên gia về mọi mặt (bảo mật, tối ưu hóa, các pattern mới).
-* **Lo ngại về bảo mật code:** Giữ code của dự án hoàn toàn trong môi trường local, không gửi đi bất kỳ đâu.
-
-**Giải pháp Đề xuất: Hệ thống NovaGuard AI**
-
-NovaGuard AI là một hệ thống Đa Agent Lai được thiết kế để hoạt động như một "người đồng hành" review code thông minh.
-
-**I. Kiến trúc Tổng thể:**
-
-* **Agent Điều phối Trung tâm (Orchestrator Agent):** "Bộ não" của NovaGuard AI.
-    * **Tiếp nhận & Phân tích Thông minh:** Nhận dữ liệu merge request, thực hiện phân tích `diff` và ngữ cảnh liên quan.
-    * **Kích hoạt Agent theo Tầng:**
-        * **Tầng 1 (Fast Pass):** Kích hoạt các công cụ linter, formatter, SAST cơ bản và agent LLM nhẹ để có phản hồi nhanh về lỗi cú pháp, phong cách, và các vấn đề nghiêm trọng dễ thấy.
-        * **Tầng 2 (Deep Analysis):** Kích hoạt các agent LLM mạnh mẽ hơn để phân tích sâu lỗi logic, side effect, bảo mật phức tạp, tối ưu hóa. Có thể chạy song song hoặc theo yêu cầu.
-    * **Quản lý Ngữ cảnh Chung (Shared Context):** Chia sẻ thông tin (kết quả từ tool, loại ngôn ngữ, v.v.) giữa các agent.
-    * **Tổng hợp & Tinh chỉnh Thông minh:** Thu thập kết quả, áp dụng điểm tin cậy (confidence scoring) cho gợi ý LLM, lọc nhiễu.
-    * **(Nâng cao) Agent Siêu Giám định (Meta-Review LLM Agent):** Một LLM cuối cùng kiểm tra, tổng hợp và cải thiện chất lượng toàn bộ các gợi ý.
-    * **Báo cáo Thân thiện:** Tạo comment trên GitHub dễ đọc, có tóm tắt, giải thích "tại sao" và gợi ý "cách sửa".
-    * **Vòng lặp Phản hồi:** Cho phép người dùng đánh giá gợi ý để cải thiện hệ thống.
-    * **Cấu hình Linh hoạt:** Mọi thứ (prompts, models, tool paths, rules) được quản lý qua file cấu hình.
-
-**II. Thiết kế Chi tiết các Agent Chuyên biệt (Phương pháp Lai):**
-
-1.  **Guardian Style (Agent Phân tích Cấu trúc & Phong cách Code):**
-    * **Công cụ:** Chạy linter (ESLint, Pylint, Checkstyle, SwiftLint, etc.) & formatter.
-    * **LLM (ví dụ: `qwen3-coder:15b-instruct`, `codellama-v3:13b-style` - bản T5/2025):** Giải thích output của tool, gợi ý sửa lỗi phức tạp, phát hiện vấn đề phong cách sâu hơn, kiểm tra comment.
-
-2.  **BugHunter AI (Agent Phát hiện Lỗi Tiềm ẩn & Phân tích Luồng):**
-    * **Công cụ (Tùy chọn):** Các tool tìm bug tĩnh nhẹ.
-    * **LLM (ví dụ: `deepseek-coder-v2:33b-instruct`, `wizardcoder-evo:30b` - bản T5/2025):** Săn lỗi logic, null pointer, rò rỉ tài nguyên, phân tích side effect, gợi ý test case.
-
-3.  **SecuriSense AI (Agent Kiểm tra Bảo mật Chuyên sâu):**
-    * **Công cụ (Bắt buộc):** Các công cụ SAST mạnh mẽ (Semgrep, SonarScanner local, OWASP ZAP passive, etc.).
-    * **LLM (ví dụ: `securecode-llama:20b-instruct`, `qwen3-sec:15b-chat` - bản T5/2025):** Sàng lọc false positive từ SAST, ưu tiên lỗ hổng, giải thích nguy cơ, đề xuất vá lỗi, và cố gắng tìm các mẫu không an toàn mới (cần cẩn trọng).
-
-4.  **OptiTune AI (Agent Đề xuất Tối ưu hóa & Hiện đại hóa Code):**
-    * **LLM (ví dụ: `codegemma-plus:12b-instruct`, `qwen3-coder:15b-instruct` - bản T5/2025):** Tìm điểm nghẽn hiệu năng, gợi ý dùng tính năng ngôn ngữ mới, thuật toán hiệu quả, refactor để dễ bảo trì.
-
-**III. Công nghệ Nền tảng:**
-
-* **GitHub Actions:** Nền tảng tự động hóa workflow.
-* **Self-hosted Runner:** Đảm bảo chạy trên máy local của bạn.
-* **Ollama:** Để chạy các LLM offline.
-* **Mô hình LLM (Tháng 5/2025):** Các model open source mạnh mẽ, có giấy phép thương mại (ví dụ các dòng Qwen, Code Llama, DeepSeek Coder, Starcoder, Mistral, Gemma đã được nâng cấp). *Lưu ý: Tên model cụ thể là giả định, cần nghiên cứu các model mới nhất tại thời điểm triển khai.*
-* **Công cụ Phân tích Tĩnh Truyền thống:** Linters, formatters, SAST tools phù hợp với các ngôn ngữ trong dự án.
-* **Ngôn ngữ phát triển Agent Điều phối:** Python (khuyến nghị do có nhiều thư viện hỗ trợ AI/LLM và hệ thống).
-
-**IV. Tính năng & Lợi ích Nổi bật:**
-
-* **Review Toàn diện:** Bao phủ nhiều khía cạnh từ phong cách, lỗi, bảo mật đến tối ưu hóa.
-* **Tăng cường Chất lượng Code:** Giúp code sạch hơn, an toàn hơn, dễ bảo trì hơn.
-* **Tiết kiệm Thời gian:** Giảm đáng kể thời gian review thủ công.
-* **Phản hồi Nhanh chóng:** Giúp developer sửa lỗi sớm trong chu trình phát triển.
-* **Bảo mật Tuyệt đối:** Toàn bộ code và quá trình phân tích diễn ra trên máy local.
-* **Học hỏi & Nâng cao Kỹ năng:** Developer học được từ các giải thích và gợi ý của AI.
-* **Tùy biến Cao:** Dễ dàng cấu hình agent, model, rule cho phù hợp với từng dự án.
-* **Dễ Mở rộng:** Có thể thêm agent mới cho các khía cạnh review mới trong tương lai.
-
-**V. Những Điểm cần Lưu ý khi Triển khai:**
-
-* **Thiết lập Môi trường Local:** Cần đảm bảo self-hosted runner và Ollama được cài đặt, cấu hình đúng cách.
-* **Tài nguyên Phần cứng:** Chạy nhiều LLM có thể yêu cầu cấu hình máy local mạnh (GPU, RAM).
-* **Nghệ thuật Prompt Engineering:** Chất lượng gợi ý phụ thuộc rất nhiều vào việc thiết kế prompt cho từng agent.
-* **Quản lý Cấu hình:** Duy trì hệ thống file cấu hình một cách khoa học.
-* **Xây dựng Bộ Đánh giá (Evaluation Framework):** Cần có bộ test case để kiểm tra và đảm bảo chất lượng của hệ thống khi có thay đổi.
-
-**VI. Tiềm năng Phát triển trong Tương lai:**
-
-* **Tích hợp Sâu hơn với IDE:** Đưa gợi ý trực tiếp vào môi trường phát triển của lập trình viên.
-* **Fine-tuning Model trên Codebase Riêng:** Huấn luyện thêm các model LLM trên dữ liệu code và review của chính dự án để tăng độ chính xác và phù hợp.
-* **Hỗ trợ Tự động Sửa lỗi (Auto-fix) có Giám sát:** Cho phép AI đề xuất các bản vá tự động cho một số loại lỗi đơn giản, nhưng luôn cần sự phê duyệt của con người.
-* **Phân tích Ảnh hưởng Liên Module (Cross-Module Impact Analysis):** Mở rộng khả năng phân tích side effect ra ngoài phạm vi file hiện tại.
-
-**Lời kết:**
-NovaGuard AI không chỉ là một công cụ, mà là một người đồng hành thông minh, giúp đội ngũ của bạn chinh phục những dòng code chất lượng cao hơn, an toàn hơn và hiệu quả hơn. Bằng cách kết hợp những gì tốt nhất của công nghệ hiện có và trí tuệ nhân tạo tiên tiến, chúng ta có thể tạo ra một cuộc cách mạng nhỏ trong quy trình phát triển phần mềm của mình.
-
----
-
-### PROMPT
-
-Chào Gemini Coding Partner,
-
-Mục tiêu của prompt này là cung cấp cho bạn một bản thiết kế chi tiết và toàn diện để bạn có thể bắt đầu xây dựng dự án **NovaGuard AI**. Đây là một GitHub Action review code thông minh, sử dụng hệ thống Đa Agent Lai (Hybrid Multi-Agent System) kết hợp các công cụ phân tích tĩnh truyền thống với các mô hình ngôn ngữ lớn (LLM) chạy local qua Ollama.
-
-Hãy coi đây là kim chỉ nam cho quá trình phát triển của bạn. Nếu có bất kỳ điểm nào chưa rõ, đừng ngần ngại đặt câu hỏi.
-
-**Bối cảnh công nghệ:** Chúng ta đang ở tháng 5 năm 2025. Các lựa chọn về framework đã được cân nhắc. Các tên model LLM cụ thể mang tính minh họa và bạn nên tìm hiểu các model open source mới nhất, phù hợp nhất tại thời điểm code, nhưng chúng phải hỗ trợ chạy qua Ollama và có giấy phép cho phép sử dụng thương mại.
-
----
-
-## Prompt Phát triển Dự án: NovaGuard AI
-
-**1. Tổng quan Dự án:**
-
-* **Tên Dự án:** NovaGuard AI
-* **Loại Dự án:** GitHub Docker Container Action có thể tái sử dụng.
-* **Mục đích:** Cung cấp một giải pháp review code tự động, thông minh, bảo mật (chạy local), và tùy biến cao cho các dự án trên GitHub. NovaGuard AI sẽ phân tích code trong Pull Request (PR), đưa ra các nhận xét, cảnh báo về lỗi, vấn đề bảo mật, phong cách code, và gợi ý cải thiện.
-* **Công nghệ Chính:**
-    * Ngôn ngữ: Python 3.10+
-    * Framework LLM: Langchain & LangGraph
-    * LLM Runtime: Ollama (kết nối tới Ollama server đang chạy trên self-hosted runner), có thêm option để sử dụng Gemini, OpenAI API 
-    * Đóng gói Action: Docker
-    * Nền tảng CI/CD: GitHub Actions
-    * Định dạng Output chính: SARIF (Static Analysis Results Interchange Format) v2.1.0.
-
-**2. Thiết kế Chi tiết Kỹ thuật:**
-
-**I. Đóng gói GitHub Action (`action.yml`, `Dockerfile`, `src/action_entrypoint.py`)**
-
-* **`action.yml` (Metadata File):**
-    * `name`: 'NovaGuard AI Code Review'
-    * `description`: 'An intelligent code review co-pilot using LLMs and traditional tools via local Ollama.'
-    * `author`: (Để trống hoặc tên người phát triển)
-    * `branding`: `icon: 'shield'`, `color: 'blue'`
-    * `inputs`:
-        * `github_token`: `{ description: 'GitHub token for GitHub API interactions (e.g., fetching PR data if needed, though SARIF upload is preferred via a separate action).', required: true, default: '${{ github.token }}' }`
-        * `ollama_base_url`: `{ description: 'Base URL of the running Ollama server.', required: true, default: 'http://localhost:11434' }`
-        * `project_config_path`: `{ description: 'Optional path to a project-specific NovaGuard AI config directory within the target repository (e.g., .github/novaguard_config/).', required: false }`
-        * `sarif_output_file`: `{ description: 'Filename for the generated SARIF report within GITHUB_WORKSPACE.', required: false, default: 'novaguard-report.sarif' }`
-        * `fail_on_severity`: `{ description: 'Minimum severity (e.g., error, warning, note) to cause the action to fail. Default is "none".', required: false, default: 'none' }`
-    * `outputs`:
-        * `report_summary_text`: `{ description: 'A brief text summary of review findings.' }`
-        * `sarif_file_path`: `{ description: 'Workspace-relative path to the generated SARIF report file.' }`
-    * `runs`: `{ using: 'docker', image: 'Dockerfile' }`
-
-* **`Dockerfile`:**
-    * Base Image: `python:3.11-slim`
-    * `WORKDIR /app`
-    * Cài đặt các tool CLI cần thiết (ví dụ: `semgrep`, các linter như `pylint`, `eslint`, `checkstyle` - nếu không cài qua pip). Ưu tiên cài qua `pip` nếu có thể.
-    * Copy `requirements.txt`, chạy `pip install --no-cache-dir -r requirements.txt`.
-    * Copy `src/` vào `/app/src/`, `config/` vào `/app/config/`.
-    * Copy `src/action_entrypoint.py` vào `/app/action_entrypoint.py`.
-    * `ENTRYPOINT ["python", "/app/action_entrypoint.py"]`
-
-* **`src/action_entrypoint.py` (Điểm bắt đầu của Docker Action):**
-    * **Mục đích:** Nhận input từ GitHub Action environment, điều phối toàn bộ quá trình review, và tạo output.
-    * **Logic chính:**
-        1.  Đọc các input từ biến môi trường (ví dụ: `os.environ.get("INPUT_OLLAMA_BASE_URL")`).
-        2.  Lấy thông tin ngữ cảnh GitHub (`GITHUB_EVENT_PATH`, `GITHUB_REPOSITORY`, `GITHUB_WORKSPACE`, `GITHUB_SHA`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`).
-        3.  **Lấy Code Changes:** Sử dụng `git diff ${{ env.GITHUB_BASE_REF }} ${{ env.GITHUB_HEAD_REF }} --name-only` để lấy danh sách file thay đổi, sau đó đọc nội dung các file này từ `GITHUB_WORKSPACE`. Hoặc phân tích `diff_url` của PR. Ưu tiên phân tích các file đã thay đổi.
-        4.  **Tải Cấu hình:** Gọi `ConfigLoader` để tải cấu hình mặc định từ `/app/config` và override bằng `project_config_path` nếu được cung cấp. Truyền `ollama_base_url` vào đối tượng config.
-        5.  **Khởi tạo Orchestrator:** Lấy compiled LangGraph app từ `src.orchestrator.graph_definition.get_compiled_graph(config_data)`.
-        6.  **Chuẩn bị Input cho Graph:** Tạo `initial_graph_input` bao gồm `SharedReviewContext` (chứa PR info, danh sách file thay đổi, nội dung file, `repo_local_path=GITHUB_WORKSPACE`) và các dữ liệu thô cần thiết.
-        7.  **Chạy Orchestrator Graph:** `final_state = orchestrator_app.invoke(initial_graph_input)`.
-        8.  **Xử lý Kết quả:** Lấy danh sách các phát hiện (`List[Dict]`) từ `final_state`.
-        9.  **Tạo Báo cáo SARIF:** Sử dụng `SarifGenerator` để chuyển đổi danh sách phát hiện thành đối tượng JSON SARIF. Lưu file SARIF này vào `GITHUB_WORKSPACE / inputs.sarif_output_file`.
-        10. **Set Action Outputs:**
-            * `print(f"::set-output name=sarif_file_path::{inputs.sarif_output_file}")`
-            * Tạo một tóm tắt text ngắn gọn từ các phát hiện và set output `report_summary_text`.
-        11. **Kiểm tra `fail_on_severity`:** Nếu có các phát hiện với mức độ nghiêm trọng bằng hoặc cao hơn `inputs.fail_on_severity`, thì `sys.exit(1)` để Action fail.
-
-**II. Core Orchestration (LangGraph - trong `src/orchestrator/`)**
-
-* **`state.py` - `GraphState(TypedDict)`:**
-    * `shared_context: SharedReviewContext`
-    * `files_to_review: List[Dict]` (ví dụ: `[{'path': str, 'content': str, 'diff_hunks': Optional[List[str]]}]`)
-    * `tier1_tool_results: Dict[str, List[Dict]]` (key là tên tool, value là list kết quả của tool đó)
-    * `agent_findings: List[Dict]` (danh sách tất cả các phát hiện từ các agent LLM)
-    * `sarif_report_data: Optional[Dict]` (Đối tượng JSON SARIF cuối cùng)
-    * `error_messages: List[str]`
-
-* **`nodes.py` - Các hàm Node cho LangGraph:** (Mỗi hàm nhận `GraphState`, trả về `Dict` để cập nhật state)
-    * **`prepare_review_files_node(state: GraphState) -> Dict:`**: Dựa trên `shared_context` (thông tin diff từ GitHub), xác định danh sách các file cần review và nội dung của chúng. Cập nhật `files_to_review`.
-    * **`run_tier1_tools_node(state: GraphState) -> Dict:`**: Với mỗi file trong `files_to_review`, chạy các tool truyền thống (linters, SAST cơ bản như Semgrep với rule nhẹ) đã được cấu hình trong `tools.yml` thông qua `ToolRunner`. Lưu kết quả vào `tier1_tool_results`.
-    * **`activate_style_guardian_node(state: GraphState) -> Dict:`**: Gọi `StyleGuardianAgent`. Input là các file và kết quả linter từ `tier1_tool_results`. Thêm kết quả vào `agent_findings`.
-    * **`activate_bug_hunter_node(state: GraphState) -> Dict:`**: Gọi `BugHunterAgent`. Input là các file. Thêm kết quả vào `agent_findings`.
-    * **`activate_securi_sense_node(state: GraphState) -> Dict:`**: Gọi `SecuriSenseAgent`. Input là các file và kết quả SAST từ `tier1_tool_results`. Thêm kết quả vào `agent_findings`.
-    * **`activate_opti_tune_node(state: GraphState) -> Dict:`**: Gọi `OptiTuneAgent`. Input là các file. Thêm kết quả vào `agent_findings`.
-    * **`(Optional) run_meta_review_node(state: GraphState) -> Dict:`**: Gọi `MetaReviewerAgent` để lọc, ưu tiên và tinh chỉnh `agent_findings`.
-    * **`generate_sarif_report_node(state: GraphState) -> Dict:`**: Gọi `SarifGenerator` để chuyển đổi `tier1_tool_results` và `agent_findings` (đã được chuẩn hóa) thành một báo cáo SARIF. Cập nhật `sarif_report_data`.
-
-* **`graph_definition.py` - `get_compiled_graph(config_data: Config) -> CompiledGraph:`**:
-    * Khởi tạo `StateGraph(GraphState)`.
-    * Thêm các node đã định nghĩa.
-    * **Entry Point:** `prepare_review_files_node`.
-    * **Edges:**
-        * `prepare_review_files_node` -> `run_tier1_tools_node`.
-        * `run_tier1_tools_node` -> (điểm bắt đầu của các agent, có thể chạy song song nếu độc lập, hoặc tuần tự). Cân nhắc việc các agent chỉ hoạt động trên các file phù hợp với ngôn ngữ của chúng.
-        * Các agent node -> `run_meta_review_node` (nếu có) -> `generate_sarif_report_node`.
-    * **Conditional Edges:** Có thể dùng để bỏ qua một số agent nếu không có file phù hợp hoặc dựa trên cấu hình.
-    * Compile graph và trả về.
-
-**III. Specialized Hybrid Agents (trong `src/agents/`)**
-
-* Mỗi agent là một class, ví dụ `StyleGuardianAgent`.
-* **`__init__(self, config: Config, ollama_client: OllamaClientWrapper, prompt_manager: PromptManager, tool_runner: Optional[ToolRunner] = None)`**.
-* **`review(self, files_data: List[Dict], tool_outputs_for_agent: Optional[List[Dict]] = None) -> List[Dict]:`**:
-    * `files_data`: danh sách các file (`{'path': str, 'content': str, 'language': str}`).
-    * `tool_outputs_for_agent`: kết quả từ các tool liên quan đến agent này (ví dụ, output của Pylint cho StyleGuardian).
-    * **Logic:**
-        1.  Lặp qua `files_data`.
-        2.  **Tích hợp Tool:** Nếu có `tool_outputs_for_agent`, sử dụng chúng.
-        3.  **LLM Interaction:**
-            * Xây dựng prompt (sử dụng `PromptManager`) dựa trên nội dung file, output của tool (nếu có), ngôn ngữ, và các yêu cầu cụ thể của agent.
-            * Gọi `ollama_client.invoke(prompt, model_name=self.config.get_model_for_agent(self.agent_name))`.
-            * Phân tích output của LLM (kỳ vọng là JSON hoặc markdown có cấu trúc).
-            * Chuyển đổi thành một cấu trúc dictionary chuẩn cho mỗi "phát hiện" (finding), bao gồm: `file_path`, `line_start`, `line_end`, `message_text`, `level` (error, warning, note - theo SARIF), `rule_id` (tên agent + mã lỗi), `code_snippet_suggestion` (nếu có).
-        4.  Trả về `List[Dict]` các phát hiện.
-
-* **Cụ thể cho từng Agent:**
-    * **`StyleGuardianAgent`:** Sử dụng output từ linters (Pylint, ESLint, Checkstyle...). LLM giải thích, gợi ý sửa lỗi phức tạp, tìm vấn đề phong cách khác.
-    * **`BugHunterAgent`:** LLM tập trung tìm lỗi logic, null pointers, resource leaks, side effects.
-    * **`SecuriSenseAgent`:** Sử dụng output từ SAST tools (Semgrep...). LLM giúp lọc false positives, giải thích, gợi ý vá lỗi, tìm mẫu mới (cẩn trọng).
-    * **`OptiTuneAgent`:** LLM tìm điểm nghẽn hiệu năng, gợi ý tối ưu, dùng feature mới của ngôn ngữ.
-    * **`(Optional) MetaReviewerAgent`:** LLM nhận tất cả `agent_findings`, lọc trùng lặp, đánh giá độ tin cậy, tổng hợp.
-
-**IV. Core Utility Modules (trong `src/core/`)**
-
-* **`config_loader.py` - `Config` class & `load_config()`:**
-    * Tải `models.yml` (tên model Ollama cho từng agent/task), `tools.yml` (command, args cho Pylint, Semgrep...).
-    * Tải prompt templates từ `config/prompts/`.
-    * Lưu trữ `ollama_base_url`.
-* **`ollama_client.py` - `OllamaClientWrapper`:**
-    * Kết nối tới `ollama_base_url`.
-    * Phương thức `invoke(prompt: str, model_name: str, system_message: Optional[str] = None, temperature: float = 0.5, ...) -> str`.
-* **`tool_runner.py` - `ToolRunner`:**
-    * Phương thức `run(tool_name: str, file_path: str, project_root: str) -> Dict:` (trả về output đã parse, ví dụ JSON nếu tool hỗ trợ, hoặc text thô). Cần xử lý `cwd` và các tham số dòng lệnh.
-* **`sarif_generator.py` - `SarifGenerator` class hoặc functions:**
-    * Phương thức `add_finding(self, file_path: str, line_start: int, message_text: str, rule_id: str, level: str, ...)`.
-    * Phương thức `get_sarif_report() -> Dict:` (trả về đối tượng JSON SARIF hoàn chỉnh). Tuân thủ schema SARIF v2.1.0.
-* **`prompt_manager.py` - `PromptManager`:**
-    * `get_prompt(prompt_name: str, variables: Dict) -> str` (sử dụng Jinja2 templates).
-* **`shared_context.py` - `SharedReviewContext(BaseModel)` (Pydantic model):**
-    * Định nghĩa rõ ràng cấu trúc dữ liệu này (PR URL, diff content, list files/content, repo_local_path, etc.).
-
-**V. Hệ thống Cấu hình (trong `config/`)**
-
-* **`models.yml`:**
-    ```yaml
-    agents:
-      style_guardian: "codellama:13b-instruct-q5_K_M" # Tên model trên Ollama
-      bug_hunter: "deepseek-coder:33b-instruct-q4_K_M"
-      # ...
-    meta_reviewer: "mistral:7b-instruct-v0.2-q5_K_M"
-    ```
-* **`tools.yml`:**
-    ```yaml
-    linters:
-      python: "pylint --output-format=json --rcfile={project_root}/.pylintrc {file_path}"
-      # javascript: "eslint -f json -c {project_root}/.eslintrc.js {file_path}"
-    sast:
-      generic: "semgrep scan --config auto --json --output {output_file} {project_root}"
-    ```
-* **`prompts/` directory:** Chứa các file template (ví dụ: `style_guardian_python.md`).
-
-**VI. Xử lý Lỗi và Logging:**
-
-* Sử dụng `logging` module của Python.
-* Các node trong LangGraph nên bắt lỗi và cập nhật `error_messages` trong `GraphState`.
-* `action_entrypoint.py` nên log các bước chính và output các lỗi ra stdout/stderr để GitHub Actions hiển thị.
-
-**3. Ghi chú Phát triển và Kiểm thử:**
-
-* Viết unit test cho các utility function, logic phân tích output của LLM, và các phần quan trọng của agent.
-* Tạo workflow `test_action.yml` trong `.github/workflows/` để build Docker image và chạy action trên một PR mẫu trong chính repo NovaGuard AI.
-* Thiết lập một quy trình kiểm thử local (ví dụ, một script `run_local.py` mô phỏng `action_entrypoint.py` với dữ liệu mẫu) để tăng tốc độ phát triển.
-* Tập trung vào việc làm cho output của LLM có cấu trúc (JSON) để dễ parse.
-
-**4. Workflow Ví dụ cho Người dùng (trong README.md của NovaGuard AI):**
-
-```yaml
-name: NovaGuard AI Code Review
-
-on: pull_request
-
-permissions:
-  contents: read
-  security-events: write # Để upload SARIF
-
-jobs:
-  novaguard_review:
-    runs-on: self-hosted # Runner này PHẢI cài Ollama và có các model cần thiết
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with: { fetch-depth: 0 } # Lấy full history để git diff hoạt động đúng
-
-      - name: Run NovaGuard AI
-        uses: YOUR_USERNAME/novaguard_ai@v1 # Thay bằng repo của bạn
-        id: novaguard
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          ollama_base_url: 'http://your-ollama-server-address:11434'
-          # project_config_path: '.github/novaguard_config' # Tùy chọn
-          sarif_output_file: 'results/novaguard.sarif'
-          # fail_on_severity: 'warning' # Tùy chọn
-
-      - name: Upload SARIF to GitHub Code Scanning
-        if: success() || failure() # Chạy ngay cả khi step trước fail (để upload report)
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ steps.novaguard.outputs.sarif_file_path }}
-          category: 'NovaGuardAI'
-```
-
-**5. Lời nhắn cuối cùng cho Gemini Coding Partner:**
-
-Bản thiết kế này là một khung sườn chi tiết. Trong quá trình code, bạn có thể sẽ gặp những quyết định nhỏ cần đưa ra. Hãy ưu tiên sự rõ ràng, module hóa, và khả năng bảo trì. Nếu cần thiết kế lại một phần nhỏ để tối ưu hơn, hãy đề xuất. 
-LƯU Ý: 
-- Khi tạo cấu trúc project vui lòng tạo bash file đính kèm để tạo list folder/file nhanh hơn (Tôi đã tạo folder NOVAGUARD-AI) rồi.
-- Viết code lần lượt và ĐẦY ĐỦ ngay từ đầu.
-Chúc may mắn và hãy tạo ra một NovaGuard AI thật ấn tượng!
-
---- 
-## Update:
-
-Tuyệt vời! Việc NovaGuard AI đã hoạt động cơ bản trên GitHub Actions là một thành tựu lớn! Giờ là lúc chúng ta suy nghĩ về việc cải thiện và mở rộng hệ thống.
-
-Dựa trên thiết kế ban đầu và những gì chúng ta đã xây dựng, đây là một số ý tưởng nâng cấp tiềm năng, chia theo các hạng mục:
-
-**I. Cải thiện Chất lượng Review và Độ chính xác của Agent:**
-
-1.  **Tinh chỉnh Prompt Chuyên sâu (Prompt Engineering):** (**UPDATED**)
-    * **Thử nghiệm nhiều biến thể prompt:** Với mỗi agent, thử các cách diễn đạt khác nhau, thay đổi lượng context, và cấu trúc output yêu cầu để xem model nào phản hồi tốt nhất với prompt nào.
-    * **Chain-of-Thought (CoT) / Reasoning Steps:** Yêu cầu LLM giải thích các bước suy luận của nó *trước khi* đưa ra finding cuối cùng. Điều này có thể cải thiện độ chính xác, đặc biệt với BugHunter và SecuriSense. Bạn có thể yêu cầu LLM output phần giải thích này (để debug) hoặc chỉ dùng nó như một bước trung gian.
-    * **Few-Shot Learning trong Prompt:** Cung cấp một vài ví dụ (examples) về code tốt/xấu và finding mong muốn ngay trong prompt để "hướng dẫn" LLM tốt hơn, đặc biệt cho các lỗi phức tạp hoặc đặc thù của dự án.
-    * **Prompt theo Ngữ cảnh Pull Request:** Tận dụng thêm thông tin từ PR (tiêu đề, mô tả, các comment trước đó nếu có) để cung cấp ngữ cảnh rộng hơn cho LLM.
-
-2.  **Nâng cấp MetaReviewerAgent (Nếu được kích hoạt):**
-    * **Confidence Scoring:** Yêu cầu các agent LLM tự đánh giá độ tin cậy (confidence score) cho mỗi finding của chúng. MetaReviewer có thể sử dụng điểm này để lọc hoặc ưu tiên.
-    * **Cross-Agent Reasoning:** Thiết kế prompt cho MetaReviewer để nó không chỉ lọc trùng lặp mà còn cố gắng tìm ra mối liên hệ giữa các finding từ các agent khác nhau (ví dụ: một lỗi style có thể làm tăng nguy cơ một lỗi logic).
-    * **Học từ Feedback (Nâng cao):** Nếu có cách thu thập phản hồi của người dùng về chất lượng finding (ví dụ, qua comment trên PR hoặc một cơ chế khác), MetaReviewer có thể được huấn luyện (fine-tune) hoặc được cung cấp các ví dụ phản hồi đó trong prompt để cải thiện.
-
-3.  **Xử lý False Positives và False Negatives:**
-    * **False Positives (Báo sai):**
-        * Cải thiện prompt để LLM cẩn trọng hơn, yêu cầu giải thích rõ ràng hơn.
-        * Cho phép người dùng đánh dấu finding là "false positive" (ví dụ qua comment trên PR với tag đặc biệt), và có thể đưa thông tin này vào các lần review sau cho cùng một đoạn code.
-    * **False Negatives (Bỏ sót):**
-        * Thử nghiệm các model LLM lớn hơn hoặc chuyên biệt hơn cho từng agent.
-        * Bổ sung thêm các rule cho tool truyền thống (ví dụ, Semgrep ruleset tùy chỉnh).
-
-4.  **Sử dụng Tool Output Hiệu quả hơn:**
-    * **Chuẩn hóa sâu hơn output của tool:** Đảm bảo rằng output từ Pylint, Semgrep, và các tool khác được chuẩn hóa thành một cấu trúc dữ liệu thật chi tiết và nhất quán trước khi đưa vào prompt cho LLM hoặc vào `SarifGenerator`. Điều này giúp LLM dễ "tiêu hóa" hơn.
-    * **Trích xuất thông tin cụ thể từ tool:** Thay vì chỉ đưa message text, cố gắng trích xuất mã lỗi (rule ID), loại lỗi, severity từ tool để LLM có thể tham chiếu chính xác hơn.
-
-**II. Mở rộng Chức năng và Tính Năng:**
-
-5.  **Thêm Agent Mới:**
-    * **DocumentationGuardian:** Kiểm tra xem code có comment và tài liệu (docstrings) đầy đủ, rõ ràng, và cập nhật không.
-    * **TestCoverageAssessor:** (Phức tạp hơn) Phân tích code thay đổi và gợi ý các test case còn thiếu hoặc cần cập nhật (có thể dựa trên việc LLM hiểu logic code).
-    * **DependencyChecker:** (Kết hợp tool) Kiểm tra các thư viện sử dụng có lỗ hổng bảo mật đã biết (ví dụ qua `pip-audit` hoặc tích hợp Snyk/Dependabot-like tool output).
-    * **AccessibilityLinter (cho Frontend):** Nếu dự án có frontend, thêm agent/tool để kiểm tra các vấn đề về accessibility (a11y).
-
-6.  **Tích hợp Comment trực tiếp vào PR:**
-    * Như đã thảo luận, hiện tại action đang dựa vào việc upload SARIF. Bạn có thể nâng cấp `action_entrypoint.py` để:
-        * Sau khi có SARIF report, tóm tắt các finding quan trọng nhất (ví dụ, các lỗi "error" hoặc "warning").
-        * Sử dụng GitHub API (với `github_token`) để đăng một comment lên Pull Request với tóm tắt đó.
-        * **Thư viện/Action hỗ trợ:** Có thể dùng thư viện `PyGithub` trong Python hoặc action như `peter-evans/create-or-update-comment` để đơn giản hóa việc này.
-        * **Lưu ý:** Cần thêm quyền `pull-requests: write` cho workflow.
-
-7.  **Hỗ trợ Auto-Fix (Có giám sát):**
-    * Với một số lỗi đơn giản (ví dụ, lỗi style, import không dùng), LLM có thể đề xuất trực tiếp đoạn code sửa lỗi.
-    * Action có thể tạo ra một suggestion patch (diff format) và comment nó vào PR, cho phép người dùng dễ dàng chấp nhận và commit. GitHub có API cho việc này.
-    * **Cảnh báo:** Tính năng này cần được thực hiện cẩn thận và luôn cần sự review của con người trước khi áp dụng.
-
-8.  **Cấu hình Linh hoạt hơn cho Rule và Severity Mapping:**
-    * Cho phép người dùng định nghĩa cách map severity của tool/LLM sang SARIF level trong file config của dự án.
-    * Cho phép người dùng bỏ qua (ignore) một số rule cụ thể của tool hoặc agent trong file config của dự án.
-
-**III. Cải thiện Hiệu năng và Trải nghiệm Người dùng:**
-
-9.  **Tối ưu hóa Thời gian Chạy:**
-    * **Chạy song song các Agent (Nếu độc lập):** LangGraph hỗ trợ chạy các node song song nếu chúng không phụ thuộc vào output của nhau. Ví dụ, StyleGuardian, BugHunter, SecuriSense, OptiTune có thể chạy song song sau khi có `files_to_review` và `tier1_tool_results`.
-    * **Caching thông minh hơn:**
-        * Cache kết quả review cho các file không thay đổi giữa các lần commit trong cùng một PR (nếu có thể).
-        * Cache các lệnh gọi LLM nếu prompt và context không đổi (LangChain có hỗ trợ caching).
-    * **Chọn model tối ưu:** Sử dụng các model nhỏ hơn, nhanh hơn cho các tác vụ không quá phức tạp nếu chất lượng vẫn đảm bảo.
-
-10. **Logging và Debugging Tốt hơn:**
-    * Thêm tùy chọn log level chi tiết hơn (ví dụ, qua input của action).
-    * Log rõ ràng input/output của từng node trong LangGraph, và từng lời gọi LLM (có thể có option để ẩn nội dung code nhạy cảm).
-    * Nếu có thể, tích hợp với LangSmith để theo dõi và debug các chain/graph của LangChain.
-
-11. **Cải thiện Output SARIF:**
-    * Đảm bảo tất cả các trường quan trọng của SARIF được điền đầy đủ và chính xác (ví dụ: `rule.helpUri`, `result.codeFlows` nếu có).
-    * Sử dụng `partialFingerprints` để giúp GitHub nhóm các lỗi tương tự tốt hơn.
-
-**IV. Mở rộng Khả năng Tích hợp:**
-
-12. **Hỗ trợ thêm LLM Provider (Ngoài Ollama):**
-    * Như trong thiết kế ban đầu, bạn có thể thêm option để kết nối đến API của OpenAI, Gemini, Anthropic, etc. Điều này yêu cầu sửa `OllamaClientWrapper` (hoặc tạo các client riêng) và thêm cấu hình model tương ứng.
-
-13. **Web UI (Nâng cao, ngoài phạm vi GitHub Action):**
-    * Nếu muốn, bạn có thể xây dựng một Web UI riêng để hiển thị lịch sử review, thống kê, cấu hình rule, v.v. Action có thể gửi dữ liệu đến một backend API cho UI này.
-
-**Bắt đầu từ đâu?**
-
-Với nhiều ý tưởng như vậy, đây là một vài gợi ý về thứ tự ưu tiên:
-
-1.  **Ưu tiên hàng đầu: Hoàn thiện và ổn định chất lượng parsing JSON từ LLM.** Đây là nền tảng. Nếu LLM trả về cấu trúc khác nữa, bạn cần có cơ chế xử lý linh hoạt hoặc prompt mạnh mẽ hơn.
-    * In ra toàn bộ `response_text` của **tất cả các agent** để xem output thô của `qwen2.5:7b` (hoặc model bạn chọn) cho từng loại prompt.
-    * Điều chỉnh logic parsing trong từng agent cho phù hợp với output thực tế đó.
-
-2.  **Tinh chỉnh Prompt:** Sau khi parse được JSON, hãy tập trung vào việc cải thiện chất lượng nội dung của các finding bằng cách tinh chỉnh prompt.
-3.  **Tích hợp Comment trực tiếp vào PR:** Đây là một tính năng giá trị cao cho người dùng.
-4.  **Tối ưu hóa thời gian chạy:** Xem xét việc chạy song song các agent độc lập.
-
-Hãy chọn một vài điểm bạn thấy hứng thú và quan trọng nhất để bắt đầu. Chúc bạn thành công với việc nâng cấp NovaGuard AI!
