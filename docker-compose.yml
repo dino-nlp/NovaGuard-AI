@@ -104,8 +104,29 @@ services:
       - novaguard_network
     restart: unless-stopped
 
-  # novaguard_analysis_worker: # Sẽ được thêm và cấu hình sau
-  #   ...
+  novaguard_analysis_worker:
+    build:
+      context: ./novaguard-backend # Có thể dùng cùng Dockerfile với API
+      dockerfile: Dockerfile
+    container_name: novaguard_worker
+    # Lệnh để chạy script consumer.py
+    # Đảm bảo PYTHONPATH được thiết lập để Python tìm thấy các module app.*
+    command: ["python", "-m", "app.analysis_worker.consumer"]
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      kafka: # Worker phụ thuộc vào Kafka
+        condition: service_healthy
+    volumes: # Mount code để có thể cập nhật worker mà không cần rebuild image (cho dev)
+      - ./novaguard-backend/app:/app/app # Giống như API service
+    environment:
+      DATABASE_URL: "postgresql://novaguard_user:novaguard_password@postgres_db:5432/novaguard_db"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      # Không cần OLLAMA_BASE_URL cho worker ở bước này
+      PYTHONPATH: "/app" # Đảm bảo các import hoạt động
+    networks:
+      - novaguard_network
+    restart: unless-stopped # Tự khởi động lại nếu bị lỗi
 
 volumes:
   postgres_data:

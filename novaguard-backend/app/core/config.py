@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # Model configuration for Pydantic-Settings to load from .env file if present
     # For this MVP, we'll primarily rely on defaults or environment variables set in docker-compose.yml
     # model_config = SettingsConfigDict(env_file=".env", env_file_encoding='utf-8', extra='ignore')
+    
+    # Kafka settings
+    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:29092" # Địa chỉ Kafka bên trong Docker network
+    KAFKA_PR_ANALYSIS_TOPIC: str = "pr_analysis_tasks" # Tên topic cho tác vụ phân tích PR
 
 
 @lru_cache() # Cache the settings object to avoid re-reading .env file or re-creating object

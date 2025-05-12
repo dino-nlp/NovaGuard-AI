@@ -7,6 +7,7 @@ from app.core.db import get_db
 from app.auth_service import schemas, crud_user
 from app.core.security import create_access_token, verify_password
 from app.core.config import settings
+from app.common.message_queue.kafka_producer import send_pr_analysis_task
 
 router = APIRouter()
 
@@ -59,3 +60,10 @@ async def login_for_access_token(
 # @router.get("/users/me", response_model=schemas.UserPublic)
 # async def read_users_me(current_user: schemas.UserPublic = Depends(JWTBearer())): # Sẽ lỗi nếu JWTBearer chưa có
 # return current_user
+@router.post("/test-send-kafka-message", status_code=status.HTTP_202_ACCEPTED)
+async def test_send_kafka(data: dict):
+    """Endpoint tạm thời để test gửi message tới Kafka."""
+    success = await send_pr_analysis_task(data)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send message to Kafka")
+    return {"message": "Message sending task accepted", "data_sent": data}
