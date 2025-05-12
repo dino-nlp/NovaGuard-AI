@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.core.config import settings # Để có thể dùng settings nếu cần
 from app.auth_service import api as auth_api # Import auth_router
 from app.project_service import api as project_api
+from app.webhook_service import api as webhook_api # Import webhook_router
 
 app = FastAPI(
     title="NovaGuard-AI Backend",
@@ -13,6 +14,7 @@ app = FastAPI(
 # Include a_auth_router
 app.include_router(auth_api.router, prefix="/auth", tags=["Authentication"])
 app.include_router(project_api.router, prefix="/projects", tags=["Projects"])
+app.include_router(webhook_api.router, prefix="/webhooks", tags=["Webhooks"]) 
 
 @app.get("/", tags=["Root"])
 async def read_root():

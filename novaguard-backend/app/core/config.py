@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str | None = None
     GITHUB_CLIENT_SECRET: str | None = None
     GITHUB_REDIRECT_URI: str | None = "http://localhost:8000/auth/github/callback" # Ví dụ
+    GITHUB_WEBHOOK_SECRET: str | None = None # Sẽ được nạp từ biến môi trường
 
     # Model configuration for Pydantic-Settings to load from .env file if present
     # For this MVP, we'll primarily rely on defaults or environment variables set in docker-compose.yml

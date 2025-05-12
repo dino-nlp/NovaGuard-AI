@@ -68,3 +68,11 @@ def delete_project(db: Session, project_id: int, user_id: int) -> Project | None
     db.delete(db_project)
     db.commit()
     return db_project # Trả về project đã xóa (trước khi bị xóa khỏi session)
+
+# def get_project_by_github_repo_id_first(db: Session, github_repo_id: str) -> Project | None:
+# """
+# Lấy project đầu tiên tìm thấy dựa trên github_repo_id.
+# Cần cẩn thận nếu nhiều user có thể thêm cùng một repo.
+# """
+# return db.query(Project).filter(Project.github_repo_id == github_repo_id).first()
+# -> Thay vì hàm này, logic trong webhook_api.py đã query join với User rồi.

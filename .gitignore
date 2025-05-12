@@ -90,6 +90,7 @@ env/
 venv/
 ENV/
 VENV/
+!.env.example 
 
 # Spyder project settings
 .spyderproject

@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from app.core.db import Base # Import Base từ db.py
 # Import User model để thiết lập quan hệ Foreign Key
 # from app.models.user_model import User # Đảm bảo import này đúng nếu User model ở file riêng
+# from app.models.pr_analysis_request_model import PRAnalysisRequest
 
 class Project(Base):
     __tablename__ = "projects"
@@ -28,7 +29,7 @@ class Project(Base):
     owner = relationship("User", back_populates="projects")
 
     # Mối quan hệ với PRAnalysisRequest (one-to-many: một Project có nhiều PRAnalysisRequest)
-    # pr_analysis_requests = relationship("PRAnalysisRequest", back_populates="project", cascade="all, delete-orphan")
+    pr_analysis_requests = relationship("PRAnalysisRequest", back_populates="project", cascade="all, delete-orphan")
 
 
     # Ràng buộc duy nhất: một user không thể thêm cùng một github_repo_id nhiều lần

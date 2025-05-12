@@ -99,6 +99,7 @@ services:
       SECRET_KEY: "your-super-secret-key-please-change-this" # Nên đặt giá trị thực ở đây hoặc env file
       ACCESS_TOKEN_EXPIRE_MINUTES: "1440" # ví dụ 1 ngày
       # Thêm các biến môi trường khác nếu cần
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
       PYTHONPATH: "/app" # Đảm bảo Python có thể tìm thấy các module trong /app
     networks:
       - novaguard_network
