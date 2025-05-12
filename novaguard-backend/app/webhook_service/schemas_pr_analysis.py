@@ -1,7 +1,7 @@
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, List
 from datetime import datetime
-from app.models.pr_analysis_request_model import PRAnalysisStatus # Import Enum status
+from app.models import PRAnalysisStatus # Import Enum status
 
 # Schema cơ bản cho PRAnalysisRequest
 class PRAnalysisRequestBase(BaseModel):

@@ -1,8 +1,7 @@
 import unittest
 from datetime import datetime
 
-from app.models.project_model import Project # Đảm bảo PYTHONPATH
-# from app.models.user_model import User # Không cần thiết cho test model Project trực tiếp
+from app.models import Project # Đảm bảo PYTHONPATH
 
 class TestProjectModel(unittest.TestCase):
 

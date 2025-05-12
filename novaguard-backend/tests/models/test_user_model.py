@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
 
-from app.models.user_model import User # Đảm bảo PYTHONPATH
+from app.models import User # Đảm bảo PYTHONPATH
 
 class TestUserModel(unittest.TestCase):
 

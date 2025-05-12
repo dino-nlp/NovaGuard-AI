@@ -26,7 +26,7 @@ class ProjectUpdate(BaseModel):
 class ProjectPublic(ProjectBase):
     id: int
     user_id: int # Hiển thị user_id của chủ sở hữu
-    # github_webhook_id: Optional[str] = None # Sẽ thêm sau
+    github_webhook_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

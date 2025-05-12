@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session # Cần cho type hinting
 from app.main import app # app FastAPI
 from app.core.db import get_db # dependency get_db
 from app.auth_service import schemas # schemas Pydantic
-from app.models.user_model import User # model User SQLAlchemy
+from app.models import User # model User SQLAlchemy
 
 # --- Test Setup ---
 # Chúng ta cần override dependency get_db để sử dụng một DB test hoặc mock DB

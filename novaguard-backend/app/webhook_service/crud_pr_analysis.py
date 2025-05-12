@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.models.pr_analysis_request_model import PRAnalysisRequest, PRAnalysisStatus
+from app.models import PRAnalysisRequest, PRAnalysisStatus
 from app.webhook_service.schemas_pr_analysis import PRAnalysisRequestCreate
 
 def create_pr_analysis_request(db: Session, request_in: PRAnalysisRequestCreate) -> PRAnalysisRequest:

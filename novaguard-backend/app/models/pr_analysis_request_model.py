@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
-import enum # Standard Python enum
+import enum
 
 from app.core.db import Base
 # from app.models.project_model import Project # Sẽ được dùng cho relationship
@@ -35,7 +35,6 @@ class PRAnalysisRequest(Base):
 
     # Mối quan hệ với Project (nhiều PRAnalysisRequest thuộc về một Project)
     project = relationship("Project", back_populates="pr_analysis_requests")
-
     # Mối quan hệ với AnalysisFinding (một PRAnalysisRequest có nhiều AnalysisFinding)
     # findings = relationship("AnalysisFinding", back_populates="pr_analysis_request", cascade="all, delete-orphan")
 

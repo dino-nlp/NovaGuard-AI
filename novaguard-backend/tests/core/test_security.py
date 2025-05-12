@@ -1,14 +1,11 @@
 import unittest
 from datetime import timedelta, datetime, timezone
-from time import sleep
 
 from app.core.security import (
     get_password_hash,
     verify_password,
     create_access_token,
     decode_access_token,
-    SECRET_KEY, # Import để có thể dùng trong test nếu cần, nhưng thường không nên expose
-    ALGORITHM
 )
 from app.core.config import settings # Để truy cập ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -23,7 +20,7 @@ if settings.SECRET_KEY == "your-super-secret-key-please-change-this":
 
 
 class TestSecurity(unittest.TestCase):
-
+    
     def test_password_hashing_and_verification(self):
         password = "testpassword123"
         hashed_password = get_password_hash(password)
@@ -33,6 +30,11 @@ class TestSecurity(unittest.TestCase):
         self.assertFalse(verify_password("wrongpassword", hashed_password))
 
     def test_create_and_decode_access_token(self):
+        # Đảm bảo settings.SECRET_KEY có giá trị hợp lệ trước khi chạy test này
+        if not settings.SECRET_KEY or settings.SECRET_KEY == "default_jwt_secret_needs_override_from_env":
+            self.skipTest("JWT SECRET_KEY is not properly set in .env for testing token creation/decoding.")
+            return
+
         subject = "testuser@example.com"
         token = create_access_token(subject)
         self.assertIsInstance(token, str)
@@ -41,9 +43,8 @@ class TestSecurity(unittest.TestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(payload.get("sub"), subject)
         
-        # Check expiration time is roughly correct
-        expected_exp_min = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES -1) # allow 1 min diff
-        expected_exp_max = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES +1)
+        expected_exp_min = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES - 1)
+        expected_exp_max = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES + 1)
         
         token_exp_timestamp = payload.get("exp")
         self.assertIsNotNone(token_exp_timestamp)
@@ -51,24 +52,27 @@ class TestSecurity(unittest.TestCase):
         
         self.assertTrue(expected_exp_min < token_exp_datetime < expected_exp_max)
 
-
     def test_decode_invalid_token(self):
+        if not settings.SECRET_KEY or settings.SECRET_KEY == "default_jwt_secret_needs_override_from_env":
+            self.skipTest("JWT SECRET_KEY is not properly set in .env for testing token decoding.")
+            return
         invalid_token = "this.is.not.a.valid.token"
         payload = decode_access_token(invalid_token)
         self.assertIsNone(payload)
 
     def test_decode_expired_token(self):
+        if not settings.SECRET_KEY or settings.SECRET_KEY == "default_jwt_secret_needs_override_from_env":
+            self.skipTest("JWT SECRET_KEY is not properly set in .env for testing expired token.")
+            return
         subject = "expireduser@example.com"
-        # Create a token that expired 1 second ago
         expired_token = create_access_token(subject, expires_delta=timedelta(seconds=-1))
-        
-        # Wait a tiny bit to ensure it's definitely expired if system clocks are slightly off
-        # sleep(0.1) # Usually not needed if delta is clearly negative
-
         payload = decode_access_token(expired_token)
         self.assertIsNone(payload, "Expired token should not be decodable to a valid payload.")
 
     def test_custom_expiration_delta(self):
+        if not settings.SECRET_KEY or settings.SECRET_KEY == "default_jwt_secret_needs_override_from_env":
+            self.skipTest("JWT SECRET_KEY is not properly set in .env for testing custom expiration.")
+            return
         subject = "customexp@example.com"
         custom_delta = timedelta(hours=2)
         token = create_access_token(subject, expires_delta=custom_delta)
@@ -85,5 +89,6 @@ class TestSecurity(unittest.TestCase):
         
         self.assertTrue(expected_exp_min < token_exp_datetime < expected_exp_max)
 
-if __name__ == '__main__':
-    unittest.main()
+
+# if __name__ == '__main__':
+#     unittest.main()

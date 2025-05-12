@@ -1,10 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from app.core.db import Base # Import Base từ db.py
-# Import User model để thiết lập quan hệ Foreign Key
-# from app.models.user_model import User # Đảm bảo import này đúng nếu User model ở file riêng
-# from app.models.pr_analysis_request_model import PRAnalysisRequest
+from app.core.db import Base
 
 class Project(Base):
     __tablename__ = "projects"

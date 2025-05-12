@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from sqlalchemy.orm import Session
 
-from app.models.user_model import User
+from app.models import User
 from app.auth_service.schemas import UserCreate
 from app.auth_service import crud_user # Import module crud_user
 

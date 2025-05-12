@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from app.models.project_model import Project
+from app.models import Project
 from app.project_service.schemas import ProjectCreate, ProjectUpdate
 from app.project_service import crud_project
 

@@ -11,8 +11,7 @@ from sqlalchemy.orm import Session
 from app.main import app # app FastAPI
 from app.core.config import settings
 from app.core.db import get_db as actual_get_db # Import get_db gốc để override
-from app.models.user_model import User
-from app.models.project_model import Project
+from app.models import User, Project
 # Schemas được dùng để tạo payload mẫu và kiểm tra response (không trực tiếp trong mock)
 # from app.webhook_service.schemas_pr_analysis import GitHubWebhookPayload
 

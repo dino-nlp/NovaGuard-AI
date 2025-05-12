@@ -12,8 +12,7 @@ from app.project_service import crud_project # Để tìm project từ repo_id
 from app.webhook_service import schemas_pr_analysis as pr_schemas # Schemas cho PR và Webhook
 from app.webhook_service import crud_pr_analysis # CRUD cho PRAnalysisRequest
 from app.common.message_queue.kafka_producer import send_pr_analysis_task # Kafka producer
-from app.models.user_model import User # Để lấy github_access_token
-from app.models.project_model import Project
+from app.models import User, Project 
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

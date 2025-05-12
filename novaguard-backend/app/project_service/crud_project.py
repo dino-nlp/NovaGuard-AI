@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError # Để bắt lỗi UniqueConstraint
 from typing import List, Optional
 
-from app.models.project_model import Project
+from app.models import Project
 from app.project_service.schemas import ProjectCreate, ProjectUpdate
 
 def create_project(db: Session, project_in: ProjectCreate, user_id: int) -> Project | None:
