@@ -270,3 +270,273 @@ Các agent này sẽ là trái tim của khả năng phân tích chuyên sâu, t
 * **Trải nghiệm Người dùng (UX/UI):** Phải đảm bảo người dùng có thể dễ dàng hiểu và hành động dựa trên các phân tích chuyên sâu mà không cảm thấy bị quá tải thông tin.
 * **Độ chính xác và Giảm False Positives:** Cần cơ chế feedback mạnh mẽ để hệ thống ngày càng "học" và trở nên chính xác hơn.
 
+---
+
+# Working process
+
+**Giai đoạn 0: Thiết lập Môi trường và Công cụ**
+
+Trước khi đi vào từng module, chúng ta cần:
+
+1.  **Thiết lập Repository:**
+    * Tạo monorepo hoặc các repo riêng biệt cho `novaguard-ui` và `novaguard-backend`.
+    * Thiết lập các quy tắc commit, linting, formatting (ví dụ: Prettier, ESLint cho frontend; Black, Flake8, MyPy cho backend).
+2.  **Hạ tầng cơ bản với Docker:**
+    * Tạo `docker-compose.yml` ban đầu để chạy PostgreSQL và Apache Kafka (hoặc RabbitMQ).
+    * Thiết lập Ollama (có thể pull một model LLM cơ bản để thử nghiệm, ví dụ: `ollama pull llama2`).
+3.  **Thiết lập Công cụ CI/CD cơ bản (Tùy chọn ban đầu):**
+    * GitHub Actions để tự động chạy test, lint khi có commit/PR.
+
+**Kế hoạch Triển khai Module cho MVP1**
+
+Chúng ta sẽ tiếp cận theo hướng xây dựng "xương sống" của hệ thống trước, sau đó mở rộng ra các tính năng phụ trợ.
+
+**Phase 1: Nền tảng Backend và Luồng Xử lý Chính (Không có LLM Integration)**
+
+Mục tiêu của giai đoạn này là xây dựng luồng dữ liệu từ khi người dùng thêm dự án, GitHub gửi webhook, tác vụ được đưa vào hàng đợi và worker xử lý (tạm thời chỉ ghi log hoặc tạo bản ghi placeholder).
+
+1.  **Module: `Data Persistence Layer` (PostgreSQL Schema)**
+    * **Nhiệm vụ:** Định nghĩa và tạo schema SQL cho các bảng: `Users`, `Projects`, `PRAnalysisRequests`, `AnalysisFindings`.
+    * **Output:** File `schema.sql` hoặc các migration scripts (nếu dùng Alembic cho Python).
+    * **Script tạo thư mục và file cơ bản:**
+        ```bash
+        mkdir -p novaguard-backend/database
+        touch novaguard-backend/database/schema.sql
+        # Hoặc nếu dùng Alembic
+        # mkdir -p novaguard-backend/alembic/versions
+        # touch novaguard-backend/alembic/env.py
+        # touch novaguard-backend/alembic.ini
+        ```
+
+2.  **Module: `auth_service` (Dịch vụ Xác thực - Chức năng cơ bản)**
+    * **Nhiệm vụ:**
+        * API đăng ký (email/password), đăng nhập (tạo JWT token cơ bản).
+        * Model `User` Pydantic và logic tương tác DB (SQLAlchemy hoặc ORM tương tự).
+        * *Tạm thời chưa cần GitHub OAuth.*
+    * **API Endpoints:**
+        * `POST /auth/register`
+        * `POST /auth/login`
+    * **Output:** Mã nguồn cho `auth_service`, unit tests.
+    * **Script tạo thư mục và file cơ bản (ví dụ cho FastAPI):**
+        ```bash
+        mkdir -p novaguard-backend/app/auth_service/
+        touch novaguard-backend/app/auth_service/__init__.py
+        touch novaguard-backend/app/auth_service/main.py
+        touch novaguard-backend/app/auth_service/models.py
+        touch novaguard-backend/app/auth_service/schemas.py
+        touch novaguard-backend/app/auth_service/crud.py
+        touch novaguard-backend/app/auth_service/security.py
+        mkdir -p novaguard-backend/tests/auth_service
+        touch novaguard-backend/tests/auth_service/test_auth_api.py
+        ```
+
+3.  **Module: `project_service` (Dịch vụ Dự án - Chức năng cơ bản)**
+    * **Nhiệm vụ:**
+        * API thêm dự án (tạm thời chỉ lưu `github_repo_id`, `name`, `main_branch` do người dùng nhập, chưa cần tương tác GitHub API).
+        * API lấy danh sách dự án của user.
+        * Model `Project` Pydantic và logic tương tác DB.
+    * **API Endpoints:**
+        * `POST /projects`
+        * `GET /projects`
+    * **Output:** Mã nguồn cho `project_service`, unit tests.
+    * **Script tạo thư mục và file cơ bản:**
+        ```bash
+        mkdir -p novaguard-backend/app/project_service/
+        touch novaguard-backend/app/project_service/__init__.py
+        touch novaguard-backend/app/project_service/main.py
+        touch novaguard-backend/app/project_service/models.py
+        touch novaguard-backend/app/project_service/schemas.py
+        touch novaguard-backend/app/project_service/crud.py
+        mkdir -p novaguard-backend/tests/project_service
+        touch novaguard-backend/tests/project_service/test_project_api.py
+        ```
+
+4.  **Module: `Job Queue & Worker System` (Kafka/RabbitMQ + Worker Cơ bản)**
+    * **Nhiệm vụ:**
+        * Thiết lập producer để gửi message (ví dụ: từ `webhook_service` sau này).
+        * Thiết lập consumer (`analysis_worker` cơ bản) để nhận message.
+        * Worker ban đầu chỉ log message nhận được hoặc tạo một `PRAnalysisRequest` với status `pending`.
+    * **Output:** Code cho producer (ví dụ: một utility function) và consumer (`analysis_worker`), cấu hình Kafka/RabbitMQ trong `docker-compose.yml`.
+    * **Script tạo thư mục và file cơ bản:**
+        ```bash
+        mkdir -p novaguard-backend/app/analysis_worker/
+        touch novaguard-backend/app/analysis_worker/__init__.py
+        touch novaguard-backend/app/analysis_worker/consumer.py
+        # Hoặc worker.py
+        mkdir -p novaguard-backend/app/common/message_queue
+        touch novaguard-backend/app/common/message_queue/__init__.py
+        touch novaguard-backend/app/common/message_queue/producer.py
+        ```
+
+5.  **Module: `webhook_service` (Dịch vụ Webhook - Tiếp nhận và Đẩy vào Queue)**
+    * **Nhiệm vụ:**
+        * API `POST /webhooks/github` để nhận payload từ GitHub.
+        * Xác thực webhook secret (quan trọng!).
+        * Phân tích payload cơ bản (lấy `repo_id`, `pr_number`, `diff_url`, `head_sha`).
+        * Tạo một bản ghi `PRAnalysisRequests` trong DB với status `pending`.
+        * Gửi một message chứa `pr_analysis_request_id` và thông tin cần thiết vào `Job Queue`.
+    * **Output:** Mã nguồn cho `webhook_service`, unit tests (có thể mock GitHub payload).
+    * **Script tạo thư mục và file cơ bản:**
+        ```bash
+        mkdir -p novaguard-backend/app/webhook_service/
+        touch novaguard-backend/app/webhook_service/__init__.py
+        touch novaguard-backend/app/webhook_service/main.py
+        touch novaguard-backend/app/webhook_service/security.py # For webhook secret validation
+        mkdir -p novaguard-backend/tests/webhook_service
+        touch novaguard-backend/tests/webhook_service/test_webhook_handler.py
+        ```
+
+**Phase 2: Tích hợp GitHub và Hoàn thiện Luồng Phân tích (Chưa có LLM Logic)**
+
+Mục tiêu của giai đoạn này là hoàn thiện việc lấy thông tin từ GitHub và đảm bảo `analysis_worker` có thể lấy được dữ liệu cần thiết.
+
+1.  **Module: `auth_service` (Mở rộng - GitHub OAuth)**
+    * **Nhiệm vụ:**
+        * Triển khai luồng GitHub OAuth: `GET /auth/github`, `GET /auth/github/callback`.
+        * Lưu `github_access_token` (đã mã hóa) vào bảng `Users`.
+    * **Output:** Cập nhật `auth_service`, unit tests.
+
+2.  **Module: `project_service` (Mở rộng - Tích hợp GitHub API)**
+    * **Nhiệm vụ:**
+        * Sử dụng `github_access_token` của người dùng để:
+            * Lấy danh sách repositories khi người dùng "Thêm Dự án Mới".
+            * Lưu `github_repo_id`, `repo_name` chính xác từ GitHub.
+            * Thiết lập webhook trên GitHub repo khi dự án được thêm (lưu `webhook_id`).
+        * Cập nhật API `POST /projects`.
+        * API `PUT /projects/{project_id}` để cập nhật `language`, `custom_project_notes`.
+    * **Output:** Cập nhật `project_service`, unit tests.
+    * **Script tạo thư mục và file cơ bản (cho GitHub client):**
+        ```bash
+        mkdir -p novaguard-backend/app/common/github_client
+        touch novaguard-backend/app/common/github_client/__init__.py
+        touch novaguard-backend/app/common/github_client/client.py
+        ```
+
+3.  **Module: `analysis_worker` (Mở rộng - Lấy Dữ liệu PR)**
+    * **Nhiệm vụ:**
+        * Khi nhận task từ queue:
+            * Cập nhật status `PRAnalysisRequest` thành `processing`.
+            * Sử dụng `github_access_token` (cần cơ chế truyền token an toàn hoặc worker có quyền truy cập thông qua project_id) để lấy chi tiết PR từ GitHub: metadata, diff URL, và nội dung code diff.
+            * Lấy nội dung đầy đủ của các file đã thay đổi.
+            * *Tạm thời chỉ log các thông tin này hoặc lưu vào một file/DB field nháp.*
+            * Sau khi hoàn thành (hoặc lỗi), cập nhật status `PRAnalysisRequest` thành `completed` (hoặc `failed` với `error_message`).
+    * **Output:** Cập nhật `analysis_worker`, unit tests.
+
+**Phase 3: Tích hợp LLM và Tạo Báo cáo Cơ bản**
+
+Mục tiêu là kích hoạt LLM để phân tích và tạo ra các `AnalysisFindings`.
+
+1.  **Module: `llm_service_wrapper` (Module Python nội bộ)**
+    * **Nhiệm vụ:**
+        * Hàm `invoke_ollama(prompt: str, model_name: str) -> str`.
+        * Xử lý request đến Ollama server, nhận response, xử lý lỗi cơ bản.
+    * **Output:** Code cho `llm_service_wrapper`, unit tests (có thể mock Ollama response).
+    * **Script tạo thư mục và file cơ bản:**
+        ```bash
+        mkdir -p novaguard-backend/app/llm_service/
+        touch novaguard-backend/app/llm_service/__init__.py
+        touch novaguard-backend/app/llm_service/wrapper.py
+        mkdir -p novaguard-backend/tests/llm_service/
+        touch novaguard-backend/tests/llm_service/test_wrapper.py
+        ```
+
+2.  **Module: `analysis_orchestrator_service` (Logic nội bộ trong `analysis_worker`)**
+    * **Nhiệm vụ:**
+        * `create_initial_context(pr_data, diff_data) -> DynamicProjectContext`: Tạo `DynamicProjectContext` cơ bản (metadata PR, code diff, nội dung file thay đổi, ngôn ngữ dự án, ghi chú tùy chỉnh từ `Project` settings).
+        * `enrich_context` (MVP1): Đảm bảo nội dung file đã thay đổi nằm trong context.
+        * `DeepLogicBugHunterAgent_MVP1.run(context) -> List[FindingDict]`:
+            * Xây dựng prompt dựa trên `DynamicProjectContext`.
+            * Gọi `llm_service_wrapper.invoke_ollama`.
+            * Parse response của LLM để trích xuất các phát hiện (ví dụ: file_path, line_start, line_end, severity, message, suggestion). *Cần định nghĩa cấu trúc output mong đợi từ LLM.*
+        * `generate_report_structure`: Hiện tại có thể chỉ là list các `FindingDict`.
+    * **Output:** Các class/function Python trong `analysis_worker` hoặc một module riêng được `analysis_worker` gọi. Unit tests cho từng phần.
+    * **Script tạo thư mục và file cơ bản (nếu tách riêng):**
+        ```bash
+        mkdir -p novaguard-backend/app/analysis_orchestrator/
+        touch novaguard-backend/app/analysis_orchestrator/__init__.py
+        touch novaguard-backend/app/analysis_orchestrator/context_builder.py
+        touch novaguard-backend/app/analysis_orchestrator/agents.py # Chứa DeepLogicBugHunterAgent_MVP1
+        touch novaguard-backend/app/analysis_orchestrator/orchestrator.py # Logic chính điều phối
+        mkdir -p novaguard-backend/tests/analysis_orchestrator/
+        touch novaguard-backend/tests/analysis_orchestrator/test_context_builder.py
+        touch novaguard-backend/tests/analysis_orchestrator/test_agents.py
+        ```
+
+3.  **Module: `analysis_worker` (Mở rộng - Lưu Kết quả Phân tích)**
+    * **Nhiệm vụ:**
+        * Sau khi `analysis_orchestrator_service` trả về kết quả, lưu từng `AnalysisFinding` vào DB, liên kết với `PRAnalysisRequest`.
+    * **Output:** Cập nhật `analysis_worker`.
+
+**Phase 4: Frontend Cơ bản và Hiển thị Kết quả**
+
+Song song với Phase 2 hoặc 3, đội frontend có thể bắt đầu.
+
+1.  **Module: `novaguard-ui` (Ứng dụng Frontend)**
+    * **Nhiệm vụ:**
+        * Thiết lập dự án React với TypeScript, Tailwind CSS.
+        * **Trang Đăng nhập / Đăng ký:** Gọi API đến `auth_service`.
+        * **Trang Dashboard (Đơn giản):** Sau khi đăng nhập, gọi API `GET /projects` để hiển thị danh sách dự án.
+        * **Trang Thêm Dự án Mới:**
+            * Nút "Đăng nhập bằng GitHub" (chuyển hướng đến `GET /auth/github` của backend).
+            * Sau khi callback, cho phép chọn repo (gọi API của `project_service` để lấy repo, sau đó `POST /projects`).
+        * **Trang Cài đặt Dự án Cơ bản:** Gọi API `PUT /projects/{project_id}`.
+        * **Trang Chi tiết Dự án (Đơn giản):** Hiển thị danh sách PR đã được review (gọi API `GET /projects/{project_id}/prs` - API này cần được thêm vào `project_service`).
+        * **Trang Báo cáo Đánh giá PR:** Gọi API `GET /projects/{project_id}/prs/{pr_number}/report` (hoặc `GET /analysis_reports/{pr_analysis_request_id}` - API này cần được thêm vào `report_service` hoặc `project_service`) để hiển thị thông tin PR và danh sách `AnalysisFindings`.
+    * **Output:** Mã nguồn frontend.
+    * **Script tạo thư mục và file cơ bản (ví dụ với Create React App + TypeScript):**
+        ```bash
+        # npx create-react-app novaguard-ui --template typescript
+        # cd novaguard-ui
+        # npm install tailwindcss postcss autoprefixer
+        # npx tailwindcss init -p
+        mkdir -p novaguard-ui/src/pages
+        mkdir -p novaguard-ui/src/components
+        mkdir -p novaguard-ui/src/services # Chứa các hàm gọi API
+        mkdir -p novaguard-ui/src/contexts # Hoặc Redux/Zustand store
+        touch novaguard-ui/src/pages/LoginPage.tsx
+        touch novaguard-ui/src/pages/RegisterPage.tsx
+        touch novaguard-ui/src/pages/DashboardPage.tsx
+        touch novaguard-ui/src/pages/AddProjectPage.tsx
+        touch novaguard-ui/src/pages/ProjectSettingsPage.tsx
+        touch novaguard-ui/src/pages/ProjectDetailsPage.tsx
+        touch novaguard-ui/src/pages/PRReportPage.tsx
+        ```
+
+2.  **Module: `report_service` (Hoặc mở rộng `project_service`)**
+    * **Nhiệm vụ:**
+        * API `GET /projects/{project_id}/prs` (Lấy danh sách `PRAnalysisRequest` cho một dự án).
+        * API `GET /analysis_reports/{pr_analysis_request_id}` (Lấy chi tiết một `PRAnalysisRequest` và các `AnalysisFindings` liên quan).
+    * **Output:** Cập nhật/Tạo mới service API, unit tests.
+    * **Script tạo thư mục và file cơ bản (nếu là service riêng):**
+        ```bash
+        mkdir -p novaguard-backend/app/report_service/
+        touch novaguard-backend/app/report_service/__init__.py
+        touch novaguard-backend/app/report_service/main.py
+        touch novaguard-backend/app/report_service/schemas.py
+        touch novaguard-backend/app/report_service/crud.py
+        mkdir -p novaguard-backend/tests/report_service
+        touch novaguard-backend/tests/report_service/test_report_api.py
+        ```
+
+**Phase 5: Hoàn thiện, Kiểm thử và Đóng gói**
+
+1.  **Kiểm thử End-to-End:**
+    * Thực hiện các kịch bản người dùng hoàn chỉnh: Đăng ký -> Đăng nhập -> Kết nối GitHub -> Thêm dự án -> Tạo PR trên GitHub -> Xem báo cáo trên NovaGuard-AI.
+2.  **Hoàn thiện Dockerfiles và `docker-compose.yml`:**
+    * Đảm bảo tất cả các service có Dockerfile riêng.
+    * `docker-compose.yml` có thể khởi chạy toàn bộ hệ thống (bao gồm Ollama, DB, Queue, và các service của NovaGuard-AI).
+3.  **Tài liệu:**
+    * Hoàn thiện `README.md` với hướng dẫn cài đặt và chạy chi tiết.
+    * Đặc tả OpenAPI (Swagger) cho các API.
+4.  **Xử lý lỗi và Ghi log:** Rà soát và cải thiện việc xử lý lỗi, đảm bảo ghi log đầy đủ và có cấu trúc.
+5.  **Bảo mật:**
+    * Rà soát lại việc mã hóa token.
+    * Đảm bảo xác thực webhook secret.
+    * Kiểm tra các API endpoint có yêu cầu xác thực phù hợp.
+
+**Giả định và Câu hỏi làm rõ tiềm năng:**
+
+* **Truyền GitHub Access Token cho Worker:** Chúng ta cần một cơ chế an toàn. Có thể worker sẽ lấy token từ DB dựa trên `project_id` (với điều kiện `project_id` liên kết với `user_id` sở hữu token đó). Hoặc, nếu message queue hỗ trợ mã hóa, một phần của token có thể được truyền đi (ít khuyến khích hơn). Ưu tiên là worker có quyền truy cập DB để lấy token khi cần.
+* **Cấu trúc output của LLM:** Cần thống nhất sớm về định dạng JSON hoặc cấu trúc mà LLM sẽ trả về để `DeepLogicBugHunterAgent_MVP1` có thể parse. Ví dụ: một danh sách các object, mỗi object có `file_path`, `line_numbers`, `severity`, `description`, `suggestion`.
+* **Model LLM cụ thể cho Ollama trong MVP1:** Để bắt đầu, chúng ta có thể chọn một model nhỏ, đa năng như `llama2:7b` hoặc `mistral:7b` (kiểm tra lại license thương mại của chúng nếu bạn định dùng lâu dài hơn chỉ là dev ban đầu).
+* **GitHub API Rate Limiting:** Cần lưu ý về giới hạn của GitHub API, đặc biệt khi lấy nội dung nhiều file. Có thể cần cơ chế retry hoặc tối ưu hóa việc gọi API.

@@ -1,0 +1,91 @@
+
+services:
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: novaguard_postgres
+    environment:
+      POSTGRES_USER: novaguard_user
+      POSTGRES_PASSWORD: novaguard_password
+      POSTGRES_DB: novaguard_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - novaguard_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novaguard_user -d novaguard_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: novaguard_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - novaguard_network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: novaguard_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REplication_FACTOR: 1
+      # KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - novaguard_network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: novaguard_ollama_docker
+    ports:
+      - "11435:11434" # Map cổng 11435 của host tới cổng 11434 của container
+    volumes:
+      - ollama_docker_data:/root/.ollama # Sử dụng volume đã đổi tên
+    networks:
+      - novaguard_network
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    tty: true
+    restart: unless-stopped
+
+  # novaguard_backend_api: # Sẽ được thêm và cấu hình sau
+  #   ...
+
+  # novaguard_analysis_worker: # Sẽ được thêm và cấu hình sau
+  #   ...
+
+volumes:
+  postgres_data:
+  ollama_docker_data: # <-- Đảm bảo dòng này tồn tại và tên khớp với tên volume trong service ollama
+
+networks:
+  novaguard_network:
+    driver: bridge

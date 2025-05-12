@@ -1,8 +1,6 @@
+Chúng ta sẽ cùng nhau phát triển phần mềm NovaGuard-AI 2.0 – Nền tảng Phân tích Code Thông minh và Chuyên sâu
 
-
-# NovaGuard-AI 2.0 - Giai đoạn 1 (Phát triển MVP1)
-
-**Dự án:** NovaGuard-AI 2.0 – Nền tảng Phân tích Code Thông minh và Chuyên sâu
+Dưới đây là yêu cầu cũng như design của dự án:
 
 **Mục tiêu cho Giai đoạn này (MVP1):**
 Xây dựng nền tảng web cơ bản cho NovaGuard-AI 2.0, cho phép người dùng thêm các dự án GitHub và nhận được các đánh giá code thông minh, được hỗ trợ bởi LLM, cho các Pull Request của họ. Trọng tâm chính là tính năng "Đánh giá PR Tự động", quản lý người dùng và dự án cơ bản, và thiết lập ban đầu cho bộ máy phân tích.
@@ -210,4 +208,13 @@ MVP1 này là nền tảng vững chắc. Các giai đoạn phát triển trong 
 * Hoàn thiện cơ chế phản hồi người dùng và khả năng "học" của hệ thống.
 * Hỗ trợ các nền tảng quản lý source code khác.
 
----
+###
+
+Lưu ý cuối cùng để gửi tới Coding Partner:
+- Khi tạo cấu trúc folder cho project cần kèm code file bash để dễ dàng tạo nhanh.
+- Với mỗi class hay function được tạo ra, cần phải có unit test để đảm bảo tính đúng đắn của code
+- Viết code có cấu trúc tốt để dễ dàng mở rộng, thay đổi
+- Bám sát vào design, tránh đi lạc hướng.
+- Tất cả các thư viện phải đảm bảo là opensource, không có ràng buộc về license của project, phù hợp dự án hướng tới doanh nghiệp.
+
+Chúng ta sẽ cùng tạo ra một phần mềm hữu ích cho cộng đồng.
