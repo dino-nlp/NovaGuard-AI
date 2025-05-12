@@ -36,6 +36,12 @@ docker-compose up -d --build novaguard_backend_api
 # docker-compose up -d --build
 ```
 
+- Theo dõi log của 1 container:
+
+```bash
+docker-compose logs -f novaguard_backend_api
+```
+
 Test APIs tại: http://localhost:8000/docs
 
 - Xóa DB cũ để chạy lại sau khi có thay đổi

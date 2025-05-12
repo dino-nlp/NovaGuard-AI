@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS PRAnalysisRequests (
     pr_title TEXT,
     pr_github_url VARCHAR(2048), -- URL tới Pull Request trên GitHub
     head_sha VARCHAR(40), -- SHA của commit mới nhất trong PR
-    status VARCHAR(20) CHECK (status IN ('pending', 'processing', 'completed', 'failed')) DEFAULT 'pending',
+    status VARCHAR(20) CHECK (status IN ('pending', 'processing', 'data_fetched', 'completed', 'failed')) DEFAULT 'pending',
     error_message TEXT, -- Thông báo lỗi nếu quá trình phân tích thất bại
     requested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, -- Thời điểm webhook được nhận hoặc yêu cầu được tạo
     started_at TIMESTAMPTZ, -- Thời điểm worker bắt đầu xử lý

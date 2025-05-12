@@ -5,6 +5,7 @@ from app.core.db import Base
 from .user_model import User
 from .project_model import Project
 from .pr_analysis_request_model import PRAnalysisRequest, PRAnalysisStatus
+from .analysis_finding_model import AnalysisFinding
 # Ví dụ: from .analysis_finding_model import AnalysisFinding # Khi bạn có model này
 
 __all__ = [
@@ -13,5 +14,5 @@ __all__ = [
     "Project",
     "PRAnalysisRequest",
     "PRAnalysisStatus", # Đảm bảo PRAnalysisStatus cũng được export
-    # "AnalysisFinding",
+    "AnalysisFinding",
 ]

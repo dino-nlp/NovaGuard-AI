@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Ollama settings
     OLLAMA_BASE_URL: str = "http://ollama:11434" # Map tới 11435 trên host nếu dùng lựa chọn 2
+    OLLAMA_DEFAULT_MODEL: str = "codellama:7b-instruct-q4_K_M"
     
     NOVAGUARD_PUBLIC_URL: str | None = None # Ví dụ: https://abcdef123.ngrok.io hoặc https://novaguard.yourcompany.com
 
